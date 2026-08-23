@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}سجل النشاط{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>📋 سجل النشاط</h2>
+    <form method="get" style="margin-bottom:16px;">
+        <label>فلترة حسب المستخدم:</label>
+        <select name="user" onchange="this.form.submit()">
+            <option value="">الكل</option>
+            {% for u in all_users %}
+            <option value="{{ u.username }}" {{ 'selected' if u.username == filter_user }}>{{ u.display_name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+    <table>
+        <tr><th>المستخدم</th><th>الإجراء</th><th>التفاصيل</th><th>التاريخ والوقت</th></tr>
+        {% for e in entries %}
+        <tr>
+            <td>{{ e.username }}</td>
+            <td>{{ e.action }}</td>
+            <td style="text-align:right;">{{ e.details }}</td>
+            <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

@@ -17,35 +17,58 @@ import add_price_change
 import health_check
 import undo_last_import
 import excel_export
+import users as users_module
 from flask import send_file
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-this-in-production")
 
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "changeme")
-
 
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not session.get("logged_in"):
+        if not session.get("username"):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return wrapper
 
 
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get("is_admin"):
+            flash("هذه الصفحة للمدير فقط")
+            return redirect(url_for("dashboard"))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def log(action, details=""):
+    """يسجّل نشاط المستخدم الحالي فى سجل النشاط"""
+    if session.get("username"):
+        users_module.log_activity(session["username"], action, details)
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if request.form.get("password") == APP_PASSWORD:
-            session["logged_in"] = True
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        user = users_module.verify_login(username, password)
+        if user:
+            session["username"] = user["username"]
+            session["display_name"] = user["display_name"]
+            session["is_admin"] = bool(user["is_admin"])
+            users_module.log_activity(username, "تسجيل دخول")
             return redirect(url_for("dashboard"))
-        flash("كلمة السر غلط")
+        flash("اسم المستخدم أو كلمة السر غلط")
     return render_template("login.html")
 
 
 @app.route("/logout")
 def logout():
+    if session.get("username"):
+        users_module.log_activity(session["username"], "تسجيل خروج")
     session.clear()
     return redirect(url_for("login"))
 
@@ -77,8 +100,10 @@ def import_page():
         else:
             upload_path = os.path.join("/tmp", file.filename)
             file.save(upload_path)
-            result = import_daily_submissions.import_file(upload_path)
+            result = import_daily_submissions.import_file(upload_path, performed_by=session.get("username", ""))
             os.remove(upload_path)
+            if result.get("success"):
+                log("استيراد يومي", f"استوردت {result['added']} عميل من ملف '{file.filename}'")
     return render_template("import.html", result=result)
 
 
@@ -194,6 +219,7 @@ def treasury_page():
             conn.commit()
             conn.close()
             saved = {"movement_type": movement_type, "party": party, "amount": amount}
+            log("حركة خزنة", f"{movement_type} - {party} - {amount:,.0f}")
         else:
             flash("المبلغ لازم يكون أكبر من صفر")
 
@@ -358,8 +384,10 @@ def noshow_page():
             except ValueError:
                 penalty = 0
             message = mark_no_show.mark_no_show(nid, dep, penalty)
+            log("تسجيل غياب", f"الرقم القومى {nid}, تاريخ {dep}, غرامة {penalty:,.0f}")
         else:
             message = mark_no_show.unmark_no_show(nid, dep)
+            log("إلغاء غياب", f"الرقم القومى {nid}, تاريخ {dep}")
     return render_template("noshow.html", message=message)
 
 
@@ -488,6 +516,7 @@ def sell_prices_page():
     conn = get_connection(dict_cursor=True)
     cur = conn.cursor()
     if request.method == "POST":
+        changed = 0
         for key, value in request.form.items():
             if key.startswith("price_"):
                 row_id = key.replace("price_", "")
@@ -496,8 +525,10 @@ def sell_prices_page():
                 except ValueError:
                     price = 0
                 cur.execute("UPDATE total_sell_prices SET total_price = %s WHERE id = %s", (price, row_id))
+                changed += 1
         conn.commit()
         flash("تم حفظ التعديلات")
+        log("تعديل أسعار البيع", f"عدّل {changed} صف/صفوف فى جدول أسعار البيع")
     cur.execute("""
         SELECT id, date_from, date_to, package_code, port, destination, category, total_price
         FROM total_sell_prices ORDER BY package_code, port, destination, category
@@ -574,6 +605,7 @@ def new_route_page():
         airline = request.form.get("airline", "").strip()
         if port and dest and airline:
             result = add_new_route.add_route(port, dest, airline)
+            log("إضافة خط سير", f"{port} -> {dest} ({airline})")
     return render_template("new_route.html", result=result,
                             ports=get_known_ports(), destinations=get_known_destinations(),
                             airlines=get_names("airlines"))
@@ -595,6 +627,7 @@ def charter_page():
         if result["success"] and request.form.get("recalculate"):
             recalc = add_charter_booking.recalculate_flight(flight, dep)
             result["message"] += f" تم إعادة حساب {recalc['updated']} حجز موجود بالفعل على هذه الرحلة."
+        log("حجز شارتر", f"رحلة {flight} فى {dep}, شركة {airline}, تكلفة {cost:,.0f}")
     return render_template("charter.html", result=result, airlines=get_names("airlines"))
 
 
@@ -616,10 +649,12 @@ def price_change_page():
             dest = request.form.get("destination", "").strip()
             add_price_change.add_sell_price_change(package, port, dest, category, value, eff_date)
             result = f"تم تسجيل سعر بيع جديد ({value:,.0f}) سارٍ من {eff_date}."
+            log("سعر بيع جديد", f"{package} / {port}->{dest} / {category}: {value:,.0f} من {eff_date}")
         else:
             component = request.form.get("component", "").strip()
             add_price_change.add_service_cost_change(package, component, category, value, eff_date)
             result = f"تم تسجيل تكلفة جديدة ({value:,.0f}) سارية من {eff_date}."
+            log("تكلفة جديدة", f"{package} / {component} / {category}: {value:,.0f} من {eff_date}")
     return render_template("price_change.html", result=result, packages=get_package_codes(),
                             ports=get_known_ports(), destinations=get_known_destinations())
 
@@ -639,7 +674,40 @@ def undo_import_page():
     if request.method == "POST":
         result = undo_last_import.undo_last_import()
         last = undo_last_import.get_last_import()
+        if result.get("success"):
+            log("تراجع عن استيراد", f"حذف {result['removed']} عميل من '{result['source_file']}'")
     return render_template("undo_import.html", last=last, result=result)
+
+
+@app.route("/activity-log")
+@login_required
+@admin_required
+def activity_log_page():
+    filter_user = request.args.get("user", "").strip() or None
+    entries = users_module.get_activity_log(username_filter=filter_user)
+    all_users = users_module.list_users()
+    return render_template("activity_log.html", entries=entries, all_users=all_users, filter_user=filter_user)
+
+
+@app.route("/users", methods=["GET", "POST"])
+@login_required
+@admin_required
+def users_page():
+    message = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        display_name = request.form.get("display_name", "").strip()
+        is_admin = bool(request.form.get("is_admin"))
+        if username and password:
+            try:
+                users_module.create_user(username, password, display_name, is_admin)
+                log("إضافة مستخدم", f"أضاف مستخدم جديد: {username}")
+                message = f"تم إنشاء المستخدم '{username}' بنجاح."
+            except Exception as e:
+                message = f"فشل الإنشاء (ربما الاسم مستخدم بالفعل): {e}"
+    all_users = users_module.list_users()
+    return render_template("users.html", all_users=all_users, message=message)
 
 
 if __name__ == "__main__":

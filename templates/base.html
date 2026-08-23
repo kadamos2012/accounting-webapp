@@ -56,12 +56,17 @@
     </style>
 </head>
 <body>
-    {% if session.logged_in %}
+    {% if session.username %}
     <div class="navbar">
         <div>
             <a href="{{ url_for('dashboard') }}">🏠 الرئيسية</a>
+            {% if session.is_admin %}
+            <a href="{{ url_for('activity_log_page') }}">📋 سجل النشاط</a>
+            <a href="{{ url_for('users_page') }}">👥 المستخدمين</a>
+            {% endif %}
         </div>
         <div>
+            <span style="margin-left:16px;">{{ session.display_name }}</span>
             <a href="{{ url_for('logout') }}">خروج</a>
         </div>
     </div>

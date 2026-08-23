@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}المستخدمين{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>👥 إضافة مستخدم جديد</h2>
+    <form method="post">
+        <label>اسم المستخدم (للدخول):</label>
+        <input type="text" name="username" required style="width:100%;">
+        <label>الاسم الظاهر:</label>
+        <input type="text" name="display_name" style="width:100%;">
+        <label>كلمة السر:</label>
+        <input type="password" name="password" required style="width:100%;">
+        <label><input type="checkbox" name="is_admin"> مدير (يقدر يشوف سجل النشاط ويضيف مستخدمين)</label>
+        <br><br>
+        <button type="submit" class="btn btn-green">إنشاء المستخدم</button>
+    </form>
+</div>
+{% if message %}
+<div class="card" style="background:#E8F5E9;">{{ message }}</div>
+{% endif %}
+
+<div class="card">
+    <h3>المستخدمين الحاليين</h3>
+    <table>
+        <tr><th>اسم المستخدم</th><th>الاسم الظاهر</th><th>مدير؟</th><th>تاريخ الإنشاء</th></tr>
+        {% for u in all_users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.display_name }}</td>
+            <td>{{ 'نعم' if u.is_admin else 'لا' }}</td>
+            <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

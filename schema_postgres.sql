@@ -229,3 +229,24 @@ CREATE TABLE import_log (
     min_id INTEGER,
     max_id INTEGER
 );
+
+-- ============ المستخدمين وسجل النشاط ============
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    display_name TEXT,
+    is_admin INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE activity_log (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_activity_log_username ON activity_log(username);
+CREATE INDEX idx_activity_log_created ON activity_log(created_at);
