@@ -538,6 +538,91 @@ def sell_prices_page():
     return render_template("sell_prices.html", rows=rows)
 
 
+@app.route("/costs/service", methods=["GET", "POST"])
+@login_required
+def service_costs_page():
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    if request.method == "POST":
+        if request.form.get("action") == "add":
+            cur.execute("""
+                INSERT INTO service_costs(date_from, date_to, package_code, component, category, cost)
+                VALUES (%s,%s,%s,%s,%s,%s)
+            """, (request.form.get("new_from") or "2020-01-01", request.form.get("new_to") or "2099-12-31",
+                  request.form.get("new_package"), request.form.get("new_component"),
+                  request.form.get("new_category"), float(request.form.get("new_cost") or 0)))
+            conn.commit()
+            flash("تم إضافة صف جديد")
+            log("إضافة تكلفة خدمة", f"{request.form.get('new_package')} / {request.form.get('new_component')}")
+        else:
+            changed = 0
+            for key, value in request.form.items():
+                if key.startswith("cost_"):
+                    row_id = key.replace("cost_", "")
+                    try:
+                        cost = float(value or 0)
+                    except ValueError:
+                        cost = 0
+                    cur.execute("UPDATE service_costs SET cost = %s WHERE id = %s", (cost, row_id))
+                    changed += 1
+            conn.commit()
+            flash("تم حفظ التعديلات")
+            log("تعديل تكلفة خدمات", f"عدّل {changed} صف/صفوف")
+    cur.execute("""
+        SELECT id, date_from, date_to, package_code, component, category, cost
+        FROM service_costs ORDER BY package_code, component, category
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return render_template("service_costs.html", rows=rows, packages=get_package_codes())
+
+
+@app.route("/costs/ticket", methods=["GET", "POST"])
+@login_required
+def ticket_costs_page():
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    if request.method == "POST":
+        if request.form.get("action") == "add":
+            cur.execute("""
+                INSERT INTO ticket_costs(date_from, date_to, port, destination, airline,
+                                          cost_adult, cost_female, cost_child, cost_infant)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (request.form.get("new_from") or "2020-01-01", request.form.get("new_to") or "2099-12-31",
+                  request.form.get("new_port"), request.form.get("new_destination"),
+                  request.form.get("new_airline"),
+                  float(request.form.get("new_adult") or 0), float(request.form.get("new_female") or 0),
+                  float(request.form.get("new_child") or 0), float(request.form.get("new_infant") or 0)))
+            conn.commit()
+            flash("تم إضافة صف جديد")
+            log("إضافة تكلفة تذاكر", f"{request.form.get('new_port')} -> {request.form.get('new_destination')} "
+                                     f"({request.form.get('new_airline')})")
+        else:
+            changed = 0
+            for key, value in request.form.items():
+                for prefix, col in [("adult_", "cost_adult"), ("female_", "cost_female"),
+                                     ("child_", "cost_child"), ("infant_", "cost_infant")]:
+                    if key.startswith(prefix):
+                        row_id = key.replace(prefix, "")
+                        try:
+                            cost = float(value or 0)
+                        except ValueError:
+                            cost = 0
+                        cur.execute(f"UPDATE ticket_costs SET {col} = %s WHERE id = %s", (cost, row_id))
+                        changed += 1
+            conn.commit()
+            flash("تم حفظ التعديلات")
+            log("تعديل تكلفة تذاكر", f"عدّل {changed} قيمة/قيم")
+    cur.execute("""
+        SELECT id, date_from, date_to, port, destination, airline, cost_adult, cost_female, cost_child, cost_infant
+        FROM ticket_costs ORDER BY port, destination, airline
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return render_template("ticket_costs.html", rows=rows, ports=get_known_ports(),
+                            destinations=get_known_destinations(), airlines=get_names("airlines"))
+
+
 @app.route("/bookings/period", methods=["GET", "POST"])
 @login_required
 def period_bookings_page():

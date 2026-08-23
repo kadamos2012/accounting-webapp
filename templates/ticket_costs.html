@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}تعديل تكلفة التذاكر{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>✈ إضافة تكلفة تذاكر جديدة</h2>
+    <form method="post">
+        <input type="hidden" name="action" value="add">
+        <label>المنفذ:</label>
+        <input list="portList" name="new_port" style="width:100%;" required>
+        <datalist id="portList">{% for p in ports %}<option value="{{ p }}">{% endfor %}</datalist>
+        <label>الوجهة:</label>
+        <input list="destList" name="new_destination" style="width:100%;" required>
+        <datalist id="destList">{% for d in destinations %}<option value="{{ d }}">{% endfor %}</datalist>
+        <label>شركة الطيران:</label>
+        <input list="airlineList" name="new_airline" style="width:100%;" required>
+        <datalist id="airlineList">{% for a in airlines %}<option value="{{ a }}">{% endfor %}</datalist>
+        <label>تكلفة البالغ:</label><input type="number" step="0.01" name="new_adult" value="0">
+        <label>تكلفة الأنثى:</label><input type="number" step="0.01" name="new_female" value="0">
+        <label>تكلفة الطفل:</label><input type="number" step="0.01" name="new_child" value="0">
+        <label>تكلفة الرضيع:</label><input type="number" step="0.01" name="new_infant" value="0">
+        <br><br>
+        <button type="submit" class="btn btn-green">إضافة</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>تعديل التكاليف الحالية</h2>
+    <form method="post">
+        <table>
+            <tr><th>المنفذ</th><th>الوجهة</th><th>شركة الطيران</th><th>بالغ</th><th>أنثى</th><th>طفل</th><th>رضيع</th></tr>
+            {% for r in rows %}
+            <tr>
+                <td>{{ r.port }}</td>
+                <td>{{ r.destination }}</td>
+                <td>{{ r.airline }}</td>
+                <td><input type="number" step="0.01" name="adult_{{ r.id }}" value="{{ r.cost_adult }}" style="width:90px;"></td>
+                <td><input type="number" step="0.01" name="female_{{ r.id }}" value="{{ r.cost_female }}" style="width:90px;"></td>
+                <td><input type="number" step="0.01" name="child_{{ r.id }}" value="{{ r.cost_child }}" style="width:90px;"></td>
+                <td><input type="number" step="0.01" name="infant_{{ r.id }}" value="{{ r.cost_infant }}" style="width:90px;"></td>
+            </tr>
+            {% endfor %}
+        </table>
+        <br>
+        <button type="submit" class="btn btn-green">حفظ كل التعديلات</button>
+    </form>
+</div>
+{% endblock %}
