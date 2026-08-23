@@ -3,6 +3,7 @@ app.py - Main Flask web application. Run locally with `python app.py` for
 testing, or deploy to Render (which runs it via gunicorn automatically).
 """
 import os
+from datetime import datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 
@@ -15,6 +16,8 @@ import add_charter_booking
 import add_price_change
 import health_check
 import undo_last_import
+import excel_export
+from flask import send_file
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-this-in-production")
@@ -117,6 +120,17 @@ def full_report():
                             visa_results=visa_results, investment_results=investment_results,
                             airline_results=airline_results, partner_results=partner_results,
                             pl=pl, date_from=date_from, date_to=date_to)
+
+
+@app.route("/reports/full/download")
+@login_required
+def full_report_download():
+    date_from = request.args.get("from", "2020-01-01")
+    date_to = request.args.get("to", "2099-12-31")
+    buf = excel_export.build_full_report_xlsx(date_from, date_to)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    return send_file(buf, as_attachment=True, download_name=f"تقرير_الحسابات_{timestamp}.xlsx",
+                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 MOVEMENT_TYPES = [
@@ -268,6 +282,66 @@ def statement_page():
         conn.close()
 
     return render_template("statement.html", all_parties=all_parties, result=result)
+
+
+@app.route("/statement/download")
+@login_required
+def statement_download():
+    name = request.args.get("party", "").strip()
+    date_from = request.args.get("from") or "2020-01-01"
+    date_to = request.args.get("to") or "2099-12-31"
+
+    conn = get_connection()
+    cur = conn.cursor()
+    entity_type = detect_entity_type(cur, name)
+    if not entity_type:
+        conn.close()
+        flash(f"لم يتم التعرف على '{name}' كطرف معروف")
+        return redirect(url_for("statement_page"))
+
+    summary, txn_headers, txn_rows = None, None, []
+    if entity_type == "agent":
+        summary = reports.get_agent_account(cur, name, date_from, date_to)
+        cur.execute("""
+            SELECT submission_date, name, national_id, package_code, total_sales
+            FROM sales WHERE agent = %s AND submission_date BETWEEN %s AND %s ORDER BY submission_date
+        """, (name, date_from, date_to))
+        txn_headers = ["التاريخ", "اسم العميل", "الرقم القومى", "نوع الخدمة", "المبلغ"]
+        cols = [d[0] for d in cur.description]
+        txn_rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+    elif entity_type == "airline":
+        summary = reports.get_airline_account(cur, name, date_from, date_to)
+        cur.execute("""
+            SELECT departure_date, name, national_id, flight_number, ticket_cost
+            FROM sales WHERE airline = %s AND departure_date BETWEEN %s AND %s ORDER BY departure_date
+        """, (name, date_from, date_to))
+        txn_headers = ["تاريخ المغادرة", "اسم العميل", "الرقم القومى", "رقم الرحلة", "تكلفة التذكرة"]
+        cols = [d[0] for d in cur.description]
+        txn_rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+    elif entity_type == "visa":
+        summary = reports.get_visa_supplier_account(cur, name, date_from, date_to)
+    elif entity_type == "investment":
+        summary = reports.get_investment_supplier_account(cur, name, date_from, date_to)
+    elif entity_type == "partner":
+        summary = reports.get_partner_account(cur, name, date_from, date_to)
+
+    if entity_type == "agent":
+        all_time = reports.get_agent_account(cur, name, "2020-01-01", "2099-12-31")
+    elif entity_type == "airline":
+        all_time = reports.get_airline_account(cur, name, "2020-01-01", "2099-12-31")
+    elif entity_type == "visa":
+        all_time = reports.get_visa_supplier_account(cur, name, "2020-01-01", "2099-12-31")
+    elif entity_type == "investment":
+        all_time = reports.get_investment_supplier_account(cur, name, "2020-01-01", "2099-12-31")
+    else:
+        all_time = reports.get_partner_account(cur, name, "2020-01-01", "2099-12-31")
+    conn.close()
+
+    buf = excel_export.build_statement_xlsx(name, entity_type, summary, txn_headers, txn_rows, all_time)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    safe_name = excel_export.clean_filename(name)
+    return send_file(buf, as_attachment=True, download_name=f"كشف_حساب_{safe_name}_{timestamp}.xlsx",
+                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.route("/noshow", methods=["GET", "POST"])

@@ -21,6 +21,9 @@
 
 {% if result %}
 <div class="card">
+    <a href="{{ url_for('statement_download', party=result.name) }}" class="btn btn-green">⬇ تحميل Excel</a>
+</div>
+<div class="card">
     <h3>الملخص - {{ result.name }} ({{ result.entity_type }})</h3>
     <table>
         {% for key, value in result.summary.items() %}

@@ -13,6 +13,7 @@
             <input type="date" name="to" value="{{ date_to if date_to != '2099-12-31' else '' }}">
         </div>
         <button type="submit" class="btn">تحديث</button>
+        <a href="{{ url_for('full_report_download', **request.args) }}" class="btn btn-green">⬇ تحميل Excel</a>
     </form>
 </div>
 
