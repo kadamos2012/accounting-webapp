@@ -1022,8 +1022,12 @@ def client_edit_page(client_id):
         """, (client_id,))
         row = cur.fetchone()
         from pricing_engine import calculate_row
+        import psycopg2.extensions
+        # لازم نحدد cursor_factory بالتحديد هنا - الاتصال نفسه معمول عليه
+        # RealDictCursor كافتراضي، فمجرد conn.cursor() هيورّث نفس النوع برضه
+        plain_cur = conn.cursor(cursor_factory=psycopg2.extensions.cursor)
         recalculated = calculate_row(
-            cur, new_name, row["date_of_birth"], row["national_id"], row["passport_number"],
+            plain_cur, new_name, row["date_of_birth"], row["national_id"], row["passport_number"],
             row["port"], row["destination"], row["flight_number"], row["departure_date"],
             row["submission_date"], new_agent, new_category, new_package, row_already_in_db=True
         )

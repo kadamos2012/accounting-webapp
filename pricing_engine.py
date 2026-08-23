@@ -10,8 +10,84 @@ Excel system, with the NEW simplified total-selling-price model:
               cost from ticket_costs (keyed by route+airline+category+
               departure_date), with a charter_bookings override if the
               flight+date matches a chartered booking.
+
+PERFORMANCE NOTE: when processing many rows at once (e.g. a daily import of
+hundreds of clients), doing a fresh DB round-trip for every lookup on every
+row is what caused import requests to time out on Render (each round-trip
+to a remote Supabase database adds real latency, and it multiplies fast).
+build_pricing_cache() pre-loads all the small reference/pricing tables into
+memory ONCE, and every lookup_* function below will use that cache when one
+is provided - falling back to a live query otherwise (so single-row callers
+like the client-edit page keep working unchanged).
 """
-def get_package_flags(cur, package_code):
+
+
+def build_pricing_cache(cur):
+    """يجهّز كل جداول الأسعار/التكاليف/التخصيصات فى الذاكرة مرة واحدة - يقلل
+    مئات استعلامات قاعدة البيانات المتكررة أثناء استيراد ملف كبير لاستعلامات
+    قليلة جدًا، وده اللي كان بيسبب انتهاء وقت الطلب (timeout) على Render"""
+    cache = {"package_flags": {}, "sell_prices": {}, "service_costs": {},
+             "ticket_costs": {}, "investment_assignment_airline": {},
+             "investment_assignment_route": {}}
+
+    cur.execute("""
+        SELECT package_code, includes_visa, includes_investment, includes_approval, includes_ticket
+        FROM package_definitions
+    """)
+    for code, visa, inv, appr, tick in cur.fetchall():
+        cache["package_flags"][code] = (visa, inv, appr, tick)
+
+    cur.execute("""
+        SELECT id, package_code, port, destination, category, date_from, date_to, total_price
+        FROM total_sell_prices ORDER BY id
+    """)
+    for rid, pkg, port, dest, cat, dfrom, dto, price in cur.fetchall():
+        cache["sell_prices"].setdefault((pkg, port, dest, cat), []).append((dfrom, dto, price))
+
+    cur.execute("""
+        SELECT id, package_code, component, category, date_from, date_to, cost
+        FROM service_costs ORDER BY id
+    """)
+    for rid, pkg, comp, cat, dfrom, dto, cost in cur.fetchall():
+        cache["service_costs"].setdefault((pkg, comp, cat), []).append((dfrom, dto, cost))
+        cache["service_costs"].setdefault((pkg, comp, "الكل"), []).append((dfrom, dto, cost))
+
+    cur.execute("""
+        SELECT id, port, destination, airline, date_from, date_to,
+               cost_adult, cost_female, cost_child, cost_infant
+        FROM ticket_costs ORDER BY id
+    """)
+    for rid, port, dest, airline, dfrom, dto, adult, female, child, infant in cur.fetchall():
+        cache["ticket_costs"].setdefault((port, dest, airline), []).append(
+            (dfrom, dto, adult, female, child, infant))
+
+    cur.execute("""
+        SELECT id, airline, port, destination, date_from, date_to, supplier
+        FROM investment_supplier_assignment ORDER BY id
+    """)
+    for rid, airline, port, dest, dfrom, dto, supplier in cur.fetchall():
+        if airline and not port and not dest:
+            cache["investment_assignment_airline"].setdefault(airline, []).append((dfrom, dto, supplier))
+        elif port and dest and not airline:
+            cache["investment_assignment_route"].setdefault((port, dest), []).append((dfrom, dto, supplier))
+
+    return cache
+
+
+def _find_in_range(entries, target_date, value_index=0):
+    """يدوّر فى قائمة (date_from, date_to, ...) مرتبة بترتيب الإدخال الأصلي،
+    ويرجّع أول قيمة نطاقها التاريخى يغطي target_date - نفس منطق
+    'ORDER BY id LIMIT 1' فى الاستعلام الأصلي"""
+    for entry in entries:
+        dfrom, dto = entry[0], entry[1]
+        if dfrom <= target_date <= dto:
+            return entry[2 + value_index] if value_index else entry[2:]
+    return None
+
+
+def get_package_flags(cur, package_code, cache=None):
+    if cache is not None:
+        return cache["package_flags"].get(package_code, (0, 0, 0, 0))
     cur.execute("""
         SELECT includes_visa, includes_investment, includes_approval, includes_ticket
         FROM package_definitions WHERE package_code = %s
@@ -36,7 +112,13 @@ def extract_airline(flight_number):
     return flight_number.strip()
 
 
-def lookup_total_sell_price(cur, package_code, port, destination, category, submission_date):
+def lookup_total_sell_price(cur, package_code, port, destination, category, submission_date, cache=None):
+    if cache is not None:
+        entries = cache["sell_prices"].get((package_code, port, destination, category), [])
+        for dfrom, dto, price in entries:
+            if dfrom <= submission_date <= dto:
+                return price
+        return 0.0
     cur.execute("""
         SELECT total_price FROM total_sell_prices
         WHERE package_code = %s AND port = %s AND destination = %s AND category = %s
@@ -47,7 +129,13 @@ def lookup_total_sell_price(cur, package_code, port, destination, category, subm
     return row[0] if row else 0.0
 
 
-def lookup_service_cost(cur, package_code, component, category, submission_date):
+def lookup_service_cost(cur, package_code, component, category, submission_date, cache=None):
+    if cache is not None:
+        entries = cache["service_costs"].get((package_code, component, category), [])
+        for dfrom, dto, cost in entries:
+            if dfrom <= submission_date <= dto:
+                return cost
+        return 0.0
     cur.execute("""
         SELECT cost FROM service_costs
         WHERE package_code = %s AND component = %s AND (category = %s OR category = 'الكل')
@@ -58,17 +146,29 @@ def lookup_service_cost(cur, package_code, component, category, submission_date)
     return row[0] if row else 0.0
 
 
-def lookup_ticket_cost(cur, port, destination, airline, category, departure_date):
-    cur.execute("""
-        SELECT cost_adult, cost_female, cost_child, cost_infant FROM ticket_costs
-        WHERE port = %s AND destination = %s AND airline = %s
-              AND date_from <= %s AND date_to >= %s
-        ORDER BY id LIMIT 1
-    """, (port, destination, airline, departure_date, departure_date))
-    row = cur.fetchone()
-    if not row:
-        return 0.0
-    cost_adult, cost_female, cost_child, cost_infant = row
+def lookup_ticket_cost(cur, port, destination, airline, category, departure_date, cache=None):
+    if cache is not None:
+        entries = cache["ticket_costs"].get((port, destination, airline), [])
+        row = None
+        for dfrom, dto, adult, female, child, infant in entries:
+            if dfrom <= departure_date <= dto:
+                row = (adult, female, child, infant)
+                break
+        if not row:
+            return 0.0
+        cost_adult, cost_female, cost_child, cost_infant = row
+    else:
+        cur.execute("""
+            SELECT cost_adult, cost_female, cost_child, cost_infant FROM ticket_costs
+            WHERE port = %s AND destination = %s AND airline = %s
+                  AND date_from <= %s AND date_to >= %s
+            ORDER BY id LIMIT 1
+        """, (port, destination, airline, departure_date, departure_date))
+        row = cur.fetchone()
+        if not row:
+            return 0.0
+        cost_adult, cost_female, cost_child, cost_infant = row
+
     if category == "طفل":
         return cost_child
     if category == "رضيع":
@@ -83,6 +183,10 @@ def lookup_charter_cost_per_seat(cur, flight_number, departure_date, row_already
     charter booking, divided by the count of ticket-inclusive passengers on
     that exact flight+date. Returns None if this flight+date isn't a
     charter booking.
+
+    Deliberately NOT cached: charter bookings are rare (a handful at most,
+    unlike the hundreds of price/cost rows), and the seat count changes as
+    rows are inserted during the SAME import - it has to stay live.
 
     row_already_in_db must be set correctly by the caller:
       - False (daily import): the row being priced is NOT YET inserted into
@@ -114,9 +218,19 @@ def lookup_charter_cost_per_seat(cur, flight_number, departure_date, row_already
     return total_cost / seat_count
 
 
-def lookup_investment_supplier(cur, airline, departure_date, port=None, destination=None):
+def lookup_investment_supplier(cur, airline, departure_date, port=None, destination=None, cache=None):
     """يحدد مورد الاستثمار: شركة الطيران أولاً (لو فيه تخصيص ليها)، وإلا
     يرجع لخط السير (منفذ+وجهة) كاحتياطي لو مفيش تخصيص بالطيران"""
+    if cache is not None:
+        for dfrom, dto, supplier in cache["investment_assignment_airline"].get(airline, []):
+            if dfrom <= departure_date <= dto:
+                return supplier
+        if port and destination:
+            for dfrom, dto, supplier in cache["investment_assignment_route"].get((port, destination), []):
+                if dfrom <= departure_date <= dto:
+                    return supplier
+        return None
+
     cur.execute("""
         SELECT supplier FROM investment_supplier_assignment
         WHERE airline = %s AND port IS NULL AND destination IS NULL
@@ -143,7 +257,7 @@ def lookup_investment_supplier(cur, airline, departure_date, port=None, destinat
 
 def calculate_row(cur, name, dob, national_id, passport, port, destination,
                    flight_number, departure_date, submission_date, agent,
-                   category, package_code, row_already_in_db=False):
+                   category, package_code, row_already_in_db=False, cache=None):
     """Computes all derived fields for one client row. Returns a dict ready
     to be inserted into the sales table (minus id/created_at).
 
@@ -151,22 +265,27 @@ def calculate_row(cur, name, dob, national_id, passport, port, destination,
     exists in the sales table (e.g. via recalculate_flight after adding a
     charter booking, or undoing a no-show) - this is needed so the charter
     per-seat cost divides by the correct passenger count. Leave False for
-    brand-new imports (the default)."""
+    brand-new imports (the default).
+
+    cache: pass a dict built by build_pricing_cache() when processing many
+    rows in one go (e.g. daily import) to avoid a DB round-trip per lookup
+    per row. Leave None for single-row calls (client edit, etc.) - those
+    fall back to live queries automatically."""
     includes_visa, includes_investment, includes_approval, includes_ticket = \
-        get_package_flags(cur, package_code)
+        get_package_flags(cur, package_code, cache=cache)
 
     airline = extract_airline(flight_number)
 
     # ---- SELL SIDE: one total price (NEW model) ----
     total_sales = lookup_total_sell_price(cur, package_code, port, destination,
-                                           category, submission_date)
+                                           category, submission_date, cache=cache)
 
     # ---- COST SIDE: unchanged, per-component ----
-    visa_cost = lookup_service_cost(cur, package_code, "تأشيرة", category, submission_date) \
+    visa_cost = lookup_service_cost(cur, package_code, "تأشيرة", category, submission_date, cache=cache) \
         if includes_visa else 0.0
-    investment_cost = lookup_service_cost(cur, package_code, "استثمار", category, submission_date) \
+    investment_cost = lookup_service_cost(cur, package_code, "استثمار", category, submission_date, cache=cache) \
         if includes_investment else 0.0
-    approval_cost = lookup_service_cost(cur, package_code, "موافقة", category, submission_date) \
+    approval_cost = lookup_service_cost(cur, package_code, "موافقة", category, submission_date, cache=cache) \
         if includes_approval else 0.0
     service_cost_total = visa_cost + investment_cost + approval_cost
 
@@ -177,12 +296,14 @@ def calculate_row(cur, name, dob, national_id, passport, port, destination,
         if charter_per_seat is not None:
             ticket_cost = charter_per_seat
         else:
-            ticket_cost = lookup_ticket_cost(cur, port, destination, airline, category, departure_date)
+            ticket_cost = lookup_ticket_cost(cur, port, destination, airline, category, departure_date,
+                                              cache=cache)
 
     total_cost = service_cost_total + ticket_cost
     net_profit = total_sales - total_cost
 
-    investment_supplier = lookup_investment_supplier(cur, airline, departure_date, port, destination) \
+    investment_supplier = lookup_investment_supplier(cur, airline, departure_date, port, destination,
+                                                        cache=cache) \
         if includes_investment else None
 
     return {

@@ -9,7 +9,7 @@ from datetime import date, datetime
 from openpyxl import load_workbook
 
 from db import get_connection
-from pricing_engine import calculate_row
+from pricing_engine import calculate_row, build_pricing_cache
 
 REQUIRED_HEADERS = ["الاسم", "تاريخ الميلاد", "الرقم القومي", "رقم الجواز", "المنفذ",
                     "جهه المغادره", "رقم الرحله", "تاريخ المغادرة", "الوكيل",
@@ -63,6 +63,8 @@ def import_file(xlsx_path, performed_by=""):
     cur.execute("SELECT national_id, departure_date FROM sales")
     existing_keys = set(cur.fetchall())
 
+    pricing_cache = build_pricing_cache(cur)
+
     added = 0
     skipped = 0
     package_counts = {}
@@ -98,7 +100,7 @@ def import_file(xlsx_path, performed_by=""):
 
         row_data = calculate_row(
             cur, name, dob, nid, passport, port, dest, flight, dep_date,
-            submit_date, agent, category, package
+            submit_date, agent, category, package, cache=pricing_cache
         )
 
         if agent:
