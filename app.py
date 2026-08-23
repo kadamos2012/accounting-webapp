@@ -710,5 +710,93 @@ def users_page():
     return render_template("users.html", all_users=all_users, message=message)
 
 
+@app.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password_page():
+    message = None
+    if request.method == "POST":
+        current = request.form.get("current_password", "")
+        new1 = request.form.get("new_password", "")
+        new2 = request.form.get("confirm_password", "")
+        user = users_module.verify_login(session["username"], current)
+        if not user:
+            flash("كلمة السر الحالية غلط")
+        elif len(new1) < 6:
+            flash("كلمة السر الجديدة لازم تكون 6 حروف/أرقام على الأقل")
+        elif new1 != new2:
+            flash("كلمة السر الجديدة والتأكيد مش متطابقين")
+        else:
+            users_module.change_password(session["username"], new1)
+            log("تغيير كلمة السر")
+            message = "تم تغيير كلمة السر بنجاح."
+    return render_template("change_password.html", message=message)
+
+
+@app.route("/clients/search")
+@login_required
+def client_search_page():
+    query = request.args.get("q", "").strip()
+    results = []
+    if query:
+        conn = get_connection(dict_cursor=True)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, name, national_id, departure_date, agent, package_code, category
+            FROM sales WHERE name ILIKE %s OR national_id ILIKE %s
+            ORDER BY id DESC LIMIT 30
+        """, (f"%{query}%", f"%{query}%"))
+        results = cur.fetchall()
+        conn.close()
+    return render_template("client_search.html", query=query, results=results)
+
+
+@app.route("/clients/<int:client_id>", methods=["GET", "POST"])
+@login_required
+def client_edit_page(client_id):
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        new_name = request.form.get("name", "").strip()
+        new_agent = request.form.get("agent", "").strip()
+        new_package = request.form.get("package", "").strip()
+        new_category = request.form.get("category", "").strip()
+
+        cur.execute("""
+            SELECT date_of_birth, national_id, passport_number, port, destination,
+                   flight_number, departure_date, submission_date
+            FROM sales WHERE id = %s
+        """, (client_id,))
+        row = cur.fetchone()
+        from pricing_engine import calculate_row
+        recalculated = calculate_row(
+            cur, new_name, row["date_of_birth"], row["national_id"], row["passport_number"],
+            row["port"], row["destination"], row["flight_number"], row["departure_date"],
+            row["submission_date"], new_agent, new_category, new_package, row_already_in_db=True
+        )
+        cur.execute("""
+            UPDATE sales SET
+                name = %(name)s, agent = %(agent)s, package_code = %(package_code)s, category = %(category)s,
+                service_price = %(service_price)s, ticket_price = %(ticket_price)s, total_sales = %(total_sales)s,
+                visa_cost = %(visa_cost)s, investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,
+                service_cost_total = %(service_cost_total)s, ticket_cost = %(ticket_cost)s,
+                total_cost = %(total_cost)s, net_profit = %(net_profit)s,
+                investment_supplier = %(investment_supplier)s
+            WHERE id = %(client_id)s
+        """, {**recalculated, "client_id": client_id})
+        conn.commit()
+        log("تعديل حجز", f"عدّل بيانات العميل (id={client_id}): وكيل={new_agent}, باكدج={new_package}")
+        flash("تم حفظ التعديلات وإعادة الحساب")
+
+    cur.execute("SELECT * FROM sales WHERE id = %s", (client_id,))
+    client = cur.fetchone()
+    conn.close()
+    if not client:
+        flash("العميل غير موجود")
+        return redirect(url_for("client_search_page"))
+    return render_template("client_edit.html", client=client,
+                            agents=get_names("agents"), packages=get_package_codes())
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

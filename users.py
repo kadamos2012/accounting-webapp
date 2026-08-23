@@ -30,6 +30,15 @@ def verify_login(username, password):
     return None
 
 
+def change_password(username, new_password):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET password_hash = %s WHERE username = %s",
+                (generate_password_hash(new_password), username))
+    conn.commit()
+    conn.close()
+
+
 def list_users():
     conn = get_connection(dict_cursor=True)
     cur = conn.cursor()

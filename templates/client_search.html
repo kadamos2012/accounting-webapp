@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}بحث عن عميل{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🔍 البحث عن حجز</h2>
+    <form method="get">
+        <label>الاسم أو الرقم القومى:</label>
+        <input type="text" name="q" value="{{ query }}" style="width:100%;" autofocus>
+        <br><br>
+        <button type="submit" class="btn">بحث</button>
+    </form>
+</div>
+
+{% if query %}
+<div class="card">
+    <p>{{ results|length }} نتيجة</p>
+    <table>
+        <tr><th>الاسم</th><th>الرقم القومى</th><th>الوكيل</th><th>الباكدج</th><th>المغادرة</th><th></th></tr>
+        {% for r in results %}
+        <tr>
+            <td>{{ r.name }}</td>
+            <td>{{ r.national_id }}</td>
+            <td>{{ r.agent }}</td>
+            <td>{{ r.package_code }}</td>
+            <td>{{ r.departure_date }}</td>
+            <td><a href="{{ url_for('client_edit_page', client_id=r.id) }}" class="btn">تعديل</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+{% endblock %}

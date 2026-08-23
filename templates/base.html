@@ -67,6 +67,7 @@
         </div>
         <div>
             <span style="margin-left:16px;">{{ session.display_name }}</span>
+            <a href="{{ url_for('change_password_page') }}">🔑 كلمة السر</a>
             <a href="{{ url_for('logout') }}">خروج</a>
         </div>
     </div>

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}تعديل حجز{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>✏ تعديل حجز - {{ client.name }}</h2>
+    <p style="color:#555;">الرقم القومى: {{ client.national_id }} (لا يمكن تغييره هنا)</p>
+    <form method="post">
+        <label>الاسم:</label>
+        <input type="text" name="name" value="{{ client.name }}" style="width:100%;">
+
+        <label>الوكيل:</label>
+        <select name="agent" style="width:100%;">
+            {% for a in agents %}<option value="{{ a }}" {{ 'selected' if a == client.agent }}>{{ a }}</option>{% endfor %}
+        </select>
+
+        <label>الباكدج:</label>
+        <select name="package" style="width:100%;">
+            {% for p in packages %}<option value="{{ p }}" {{ 'selected' if p == client.package_code }}>{{ p }}</option>{% endfor %}
+        </select>
+
+        <label>الفئة:</label>
+        <select name="category" style="width:100%;">
+            {% for c in ['بالغ', 'انثى', 'طفل', 'رضيع'] %}
+            <option value="{{ c }}" {{ 'selected' if c == client.category }}>{{ c }}</option>
+            {% endfor %}
+        </select>
+
+        <p style="color:#555; margin-top:16px;">
+            خط السير: {{ client.port }} → {{ client.destination }} | رحلة: {{ client.flight_number }}<br>
+            المغادرة: {{ client.departure_date }} | التقديم: {{ client.submission_date }}<br>
+            السعر الحالى: {{ "{:,.0f}".format(client.total_sales) }} | التكلفة الحالية: {{ "{:,.0f}".format(client.total_cost) }}
+        </p>
+
+        <br>
+        <button type="submit" class="btn btn-green">حفظ وإعادة الحساب</button>
+    </form>
+</div>
+{% endblock %}
