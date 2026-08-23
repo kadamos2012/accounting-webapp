@@ -363,6 +363,83 @@ def noshow_page():
     return render_template("noshow.html", message=message)
 
 
+@app.route("/opening-balances", methods=["GET", "POST"])
+@login_required
+def opening_balances_page():
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        section = request.form.get("section")
+        if section == "agents":
+            for name in get_names("agents"):
+                key = name.replace(" ", "_")
+                gross = float(request.form.get(f"gross_{key}", 0) or 0)
+                discount = float(request.form.get(f"discount_{key}", 0) or 0)
+                collected = float(request.form.get(f"collected_{key}", 0) or 0)
+                cur.execute("""
+                    INSERT INTO opening_balances_agents(agent_name, gross_sales, discount, collected)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (agent_name) DO UPDATE SET
+                        gross_sales = EXCLUDED.gross_sales, discount = EXCLUDED.discount,
+                        collected = EXCLUDED.collected
+                """, (name, gross, discount, collected))
+        elif section in ("visa", "investment"):
+            table = "opening_balances_visa" if section == "visa" else "opening_balances_investment"
+            ref_table = "visa_suppliers" if section == "visa" else "investment_suppliers"
+            for name in get_names(ref_table):
+                key = name.replace(" ", "_")
+                gross = float(request.form.get(f"gross_{key}", 0) or 0)
+                discount = float(request.form.get(f"discount_{key}", 0) or 0)
+                paid = float(request.form.get(f"paid_{key}", 0) or 0)
+                cur.execute(f"""
+                    INSERT INTO {table}(supplier_name, gross_purchases, discount, paid)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (supplier_name) DO UPDATE SET
+                        gross_purchases = EXCLUDED.gross_purchases, discount = EXCLUDED.discount,
+                        paid = EXCLUDED.paid
+                """, (name, gross, discount, paid))
+        elif section == "airlines":
+            for name in get_names("airlines"):
+                key = name.replace(" ", "_")
+                revenue = float(request.form.get(f"revenue_{key}", 0) or 0)
+                cost = float(request.form.get(f"cost_{key}", 0) or 0)
+                discount = float(request.form.get(f"discount_{key}", 0) or 0)
+                paid = float(request.form.get(f"paid_{key}", 0) or 0)
+                cur.execute("""
+                    INSERT INTO opening_balances_airlines(airline_name, gross_revenue, gross_cost, discount, paid)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (airline_name) DO UPDATE SET
+                        gross_revenue = EXCLUDED.gross_revenue, gross_cost = EXCLUDED.gross_cost,
+                        discount = EXCLUDED.discount, paid = EXCLUDED.paid
+                """, (name, revenue, cost, discount, paid))
+        conn.commit()
+        flash("تم حفظ الأرصدة الافتتاحية")
+
+    def load_section(names, table, key_col, value_cols):
+        cur.execute(f"SELECT * FROM {table}")
+        existing = {r[key_col]: r for r in cur.fetchall()}
+        result = []
+        for name in names:
+            row = existing.get(name, {})
+            result.append({"name": name, "key": name.replace(" ", "_"),
+                            **{c: row.get(c, 0) for c in value_cols}})
+        return result
+
+    agents_data = load_section(get_names("agents"), "opening_balances_agents", "agent_name",
+                                ["gross_sales", "discount", "collected"])
+    visa_data = load_section(get_names("visa_suppliers"), "opening_balances_visa", "supplier_name",
+                              ["gross_purchases", "discount", "paid"])
+    investment_data = load_section(get_names("investment_suppliers"), "opening_balances_investment",
+                                    "supplier_name", ["gross_purchases", "discount", "paid"])
+    airlines_data = load_section(get_names("airlines"), "opening_balances_airlines", "airline_name",
+                                  ["gross_revenue", "gross_cost", "discount", "paid"])
+    conn.close()
+
+    return render_template("opening_balances.html", agents_data=agents_data, visa_data=visa_data,
+                            investment_data=investment_data, airlines_data=airlines_data)
+
+
 @app.route("/packages", methods=["GET", "POST"])
 @login_required
 def packages_page():
