@@ -106,6 +106,9 @@ def import_file(xlsx_path, performed_by=""):
         if row_data["airline"]:
             cur.execute("INSERT INTO airlines(name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
                         (row_data["airline"],))
+        if row_data["investment_supplier"]:
+            cur.execute("INSERT INTO investment_suppliers(name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                        (row_data["investment_supplier"],))
 
         cur.execute("""
             INSERT INTO sales(
