@@ -30,6 +30,17 @@
         {% if result.zero_price_count %}
         <p style="color: #c62828;">⚠ تحذير: {{ result.zero_price_count }} حجز اتسجل بسعر بيع صفر (ناقص تسعير).</p>
         {% endif %}
+        {% if result.new_price_combos %}
+        <div class="card" style="background:#FFF3E0; margin-top:12px;">
+            <b>💵 تركيبات جديدة أُضيفت تلقائيًا لجدول أسعار البيع بسعر صفر - جاهزة تكتبي فيها السعر:</b>
+            <ul>
+                {% for c in result.new_price_combos %}
+                <li>{{ c.package }} / {{ c.port }} → {{ c.destination }} / {{ c.category }}</li>
+                {% endfor %}
+            </ul>
+            <a href="{{ url_for('sell_prices_page') }}" class="btn btn-green">تعديل أسعار البيع دلوقتي</a>
+        </div>
+        {% endif %}
     </div>
     {% else %}
     <div class="card" style="background: #FFEBEE;">

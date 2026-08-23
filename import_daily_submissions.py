@@ -64,6 +64,7 @@ def import_file(xlsx_path, performed_by=""):
     existing_keys = set(cur.fetchall())
 
     pricing_cache = build_pricing_cache(cur)
+    new_price_placeholders = set()
 
     added = 0
     skipped = 0
@@ -97,6 +98,18 @@ def import_file(xlsx_path, performed_by=""):
         package = str(ws.cell(row=r, column=headers["نوع الخدمه"]).value or "").strip()
 
         category = notes if notes in ("طفل", "رضيع", "انثى") else "بالغ"
+
+        # ---- لو التركيبة (باكدج+خط سير+فئة) دي جديدة تمامًا (مفيش أي صف ليها
+        # فى جدول أسعار البيع)، نضيفها تلقائيًا بسعر صفر - تظهر جاهزة فى شاشة
+        # "تعديل أسعار البيع" عشان تُكتب فيها السعر الحقيقى بدل ما تختفي بصمت ----
+        price_key = (package, port, dest, category)
+        if price_key not in pricing_cache["sell_prices"] and all(price_key):
+            cur.execute("""
+                INSERT INTO total_sell_prices(date_from, date_to, package_code, port, destination, category, total_price)
+                VALUES ('2020-01-01', '2099-12-31', %s, %s, %s, %s, 0)
+            """, (package, port, dest, category))
+            pricing_cache["sell_prices"][price_key] = [("2020-01-01", "2099-12-31", 0.0)]
+            new_price_placeholders.add(price_key)
 
         row_data = calculate_row(
             cur, name, dob, nid, passport, port, dest, flight, dep_date,
@@ -153,4 +166,8 @@ def import_file(xlsx_path, performed_by=""):
         "success": True, "added": added, "skipped": skipped, "submit_date": submit_date,
         "package_counts": package_counts, "zero_price_count": zero_price_count,
         "total_sales_value": total_sales_value,
+        "new_price_combos": [
+            {"package": p, "port": port, "destination": d, "category": c}
+            for (p, port, d, c) in new_price_placeholders
+        ],
     }
