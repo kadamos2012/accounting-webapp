@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}تقرير حركة الخزنة{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🏦 تقرير حركة الخزنة</h2>
+    <form method="get">
+        <label>من تاريخ:</label>
+        <input type="date" name="from" value="{{ date_from if date_from != '2020-01-01' else '' }}">
+        <label>إلى تاريخ:</label>
+        <input type="date" name="to" value="{{ date_to if date_to != '2099-12-31' else '' }}">
+        <button type="submit" class="btn">عرض</button>
+    </form>
+</div>
+
+<div class="card">
+    <table>
+        <tr>
+            <th>التاريخ</th><th>البيان</th><th>نوع الحركة</th><th>الطرف</th>
+            <th>وارد</th><th>منصرف</th><th>يؤثر على الخزنة؟</th><th>الرصيد الجاري</th>
+        </tr>
+        {% for m in movements %}
+        <tr style="{{ 'background:#fafafa; color:#999;' if not m.affects_cash }}">
+            <td>{{ m.transaction_date }}</td>
+            <td style="text-align:right;">{{ m.description }}</td>
+            <td>{{ m.movement_type }}</td>
+            <td>{{ m.party_name or '-' }}</td>
+            <td>{{ "{:,.0f}".format(m.incoming) if m.incoming else '-' }}</td>
+            <td>{{ "{:,.0f}".format(m.outgoing) if m.outgoing else '-' }}</td>
+            <td>{{ 'نعم' if m.affects_cash else 'لا (مباشر)' }}</td>
+            <td>{{ "{:,.0f}".format(m.running_balance) if m.affects_cash else '-' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

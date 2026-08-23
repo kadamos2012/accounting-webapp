@@ -18,6 +18,7 @@ import health_check
 import undo_last_import
 import excel_export
 import users as users_module
+import recalculate_period
 from flask import send_file
 
 app = Flask(__name__)
@@ -794,6 +795,66 @@ def price_change_page():
             log("تكلفة جديدة", f"{package} / {component} / {category}: {value:,.0f} من {eff_date}")
     return render_template("price_change.html", result=result, packages=get_package_codes(),
                             ports=get_known_ports(), destinations=get_known_destinations())
+
+
+@app.route("/recalculate", methods=["GET", "POST"])
+@login_required
+def recalculate_page():
+    result = None
+    if request.method == "POST":
+        date_from = request.form.get("date_from") or "2020-01-01"
+        date_to = request.form.get("date_to") or "2099-12-31"
+        force = bool(request.form.get("force"))
+        result = recalculate_period.recalculate(date_from, date_to, force=force)
+        if not result.get("aborted"):
+            log("إعادة حساب فترة", f"من {date_from} إلى {date_to}: {result['updated']} حجز")
+    return render_template("recalculate.html", result=result)
+
+
+@app.route("/reports/sales-by-period")
+@login_required
+def sales_by_period_page():
+    date_from = request.args.get("from", "2020-01-01")
+    date_to = request.args.get("to", "2099-12-31")
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, name, national_id, agent, package_code, port, destination,
+               departure_date, submission_date, total_sales, total_cost, net_profit
+        FROM sales WHERE submission_date BETWEEN %s AND %s ORDER BY submission_date
+    """, (date_from, date_to))
+    rows = cur.fetchall()
+    totals = {
+        "sales": sum(r["total_sales"] for r in rows),
+        "cost": sum(r["total_cost"] for r in rows),
+        "profit": sum(r["net_profit"] for r in rows),
+    }
+    conn.close()
+    return render_template("sales_by_period.html", rows=rows, totals=totals,
+                            date_from=date_from, date_to=date_to)
+
+
+@app.route("/reports/treasury")
+@login_required
+def treasury_report_page():
+    date_from = request.args.get("from", "2020-01-01")
+    date_to = request.args.get("to", "2099-12-31")
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT * FROM treasury WHERE transaction_date BETWEEN %s AND %s ORDER BY transaction_date, id
+    """, (date_from, date_to))
+    movements = cur.fetchall()
+    running_balance = 0
+    processed = []
+    for m in movements:
+        is_direct = m["payment_method"] == "مباشر (بين العميل والمورد)"
+        if not is_direct:
+            running_balance += (m["incoming"] or 0) - (m["outgoing"] or 0)
+        processed.append({**m, "affects_cash": not is_direct, "running_balance": running_balance})
+    conn.close()
+    return render_template("treasury_report.html", movements=processed,
+                            date_from=date_from, date_to=date_to)
 
 
 @app.route("/health-check")

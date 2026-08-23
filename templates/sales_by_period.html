@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}تقرير مبيعات فترة{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>📈 تقرير المبيعات لفترة</h2>
+    <form method="get">
+        <label>من تاريخ:</label>
+        <input type="date" name="from" value="{{ date_from if date_from != '2020-01-01' else '' }}">
+        <label>إلى تاريخ:</label>
+        <input type="date" name="to" value="{{ date_to if date_to != '2099-12-31' else '' }}">
+        <button type="submit" class="btn">عرض</button>
+    </form>
+</div>
+
+<div class="card" style="background:#E3F2FD;">
+    <b>عدد الحجوزات: {{ rows|length }}</b> |
+    إجمالى المبيعات: {{ "{:,.0f}".format(totals.sales) }} |
+    إجمالى التكلفة: {{ "{:,.0f}".format(totals.cost) }} |
+    صافى الربح: {{ "{:,.0f}".format(totals.profit) }}
+</div>
+
+<div class="card">
+    <table>
+        <tr>
+            <th>تاريخ التقديم</th><th>الاسم</th><th>الوكيل</th><th>الباكدج</th>
+            <th>خط السير</th><th>المبيعات</th><th>التكلفة</th><th>الربح</th>
+        </tr>
+        {% for r in rows %}
+        <tr>
+            <td>{{ r.submission_date }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.agent }}</td>
+            <td>{{ r.package_code }}</td>
+            <td>{{ r.port }} → {{ r.destination }}</td>
+            <td>{{ "{:,.0f}".format(r.total_sales) }}</td>
+            <td>{{ "{:,.0f}".format(r.total_cost) }}</td>
+            <td>{{ "{:,.0f}".format(r.net_profit) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

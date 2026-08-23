@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}إعادة حساب فترة{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🔄 إعادة حساب الأسعار والتكاليف لفترة</h2>
+    <p style="color:#555;">استخدميها بعد تعديل أسعار البيع أو التكاليف أو تركيب الباكدجات، عشان
+        التغيير يتطبق على العملاء اللي اتسجلوا قبل كده فى نفس الفترة.</p>
+    <form method="post">
+        <label>من تاريخ التقديم:</label>
+        <input type="date" name="date_from" required>
+        <label>إلى تاريخ التقديم:</label>
+        <input type="date" name="date_to" required>
+        <label><input type="checkbox" name="force"> تجاوز التحذير (لو جدول أسعار البيع فاضي عن قصد)</label>
+        <br><br>
+        <button type="submit" class="btn" style="background:#6A1B9A;" onsubmit="return confirm('متأكدة؟');">
+            إعادة الحساب الآن
+        </button>
+    </form>
+</div>
+{% if result %}
+<div class="card" style="background: {{ '#FFEBEE' if result.aborted else '#E8F5E9' }};">
+    {% if result.aborted %}
+    <p>{{ result.message }}</p>
+    {% else %}
+    <p>تم إعادة حساب {{ result.updated }} حجز بنجاح.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
