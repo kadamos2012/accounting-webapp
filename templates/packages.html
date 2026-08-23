@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}تركيب الباكدجات{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🧩 تعديل تركيب الباكدجات</h2>
+    <p style="color:#555;">حددي العناصر اللي كل باكدج بيشملها (تأشيرة / استثمار / موافقة / تذكرة طيران) - ده اللي بيتحكم فى حساب التكلفة تلقائيًا.</p>
+    <form method="post">
+        <table>
+            <tr>
+                <th>الباكدج</th><th>تأشيرة</th><th>استثمار</th><th>موافقة</th><th>تذكرة طيران</th>
+            </tr>
+            {% for r in rows %}
+            <tr>
+                <td>{{ r.package_code }}</td>
+                <td><input type="checkbox" name="visa_{{ r.id }}" {{ 'checked' if r.includes_visa }}></td>
+                <td><input type="checkbox" name="investment_{{ r.id }}" {{ 'checked' if r.includes_investment }}></td>
+                <td><input type="checkbox" name="approval_{{ r.id }}" {{ 'checked' if r.includes_approval }}></td>
+                <td><input type="checkbox" name="ticket_{{ r.id }}" {{ 'checked' if r.includes_ticket }}></td>
+            </tr>
+            {% endfor %}
+        </table>
+        <br>
+        <button type="submit" class="btn btn-green">حفظ التعديلات</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>إضافة باكدج جديد</h3>
+    <form method="post">
+        <input type="hidden" name="action" value="add">
+        <label>اسم الباكدج الجديد:</label>
+        <input type="text" name="new_package_code" style="width:100%;" required>
+        <br><br>
+        <button type="submit" class="btn">إضافة</button>
+    </form>
+</div>
+{% endblock %}

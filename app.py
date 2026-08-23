@@ -363,6 +363,48 @@ def noshow_page():
     return render_template("noshow.html", message=message)
 
 
+@app.route("/packages", methods=["GET", "POST"])
+@login_required
+def packages_page():
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    if request.method == "POST":
+        if request.form.get("action") == "add":
+            new_code = request.form.get("new_package_code", "").strip()
+            if new_code:
+                cur.execute("""
+                    INSERT INTO package_definitions(package_code, includes_visa, includes_investment,
+                                                      includes_approval, includes_ticket)
+                    VALUES (%s, 0, 0, 0, 0) ON CONFLICT (package_code) DO NOTHING
+                """, (new_code,))
+                conn.commit()
+                flash(f"تم إضافة باكدج جديد: {new_code}")
+        else:
+            cur.execute("SELECT id FROM package_definitions")
+            all_ids = [r["id"] for r in cur.fetchall()]
+            for pid in all_ids:
+                cur.execute("""
+                    UPDATE package_definitions SET
+                        includes_visa = %s, includes_investment = %s,
+                        includes_approval = %s, includes_ticket = %s
+                    WHERE id = %s
+                """, (
+                    1 if request.form.get(f"visa_{pid}") else 0,
+                    1 if request.form.get(f"investment_{pid}") else 0,
+                    1 if request.form.get(f"approval_{pid}") else 0,
+                    1 if request.form.get(f"ticket_{pid}") else 0,
+                    pid,
+                ))
+            conn.commit()
+            flash("تم حفظ التعديلات")
+
+    cur.execute("SELECT id, package_code, includes_visa, includes_investment, includes_approval, includes_ticket "
+                "FROM package_definitions ORDER BY id")
+    rows = cur.fetchall()
+    conn.close()
+    return render_template("packages.html", rows=rows)
+
+
 @app.route("/prices/sell", methods=["GET", "POST"])
 @login_required
 def sell_prices_page():
