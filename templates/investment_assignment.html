@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}تخصيص موردى الاستثمار{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>⚙ تخصيص مورد استثمار جديد</h2>
+    <p style="color:#555;">الأولوية دايمًا لشركة الطيران لو محددة - خط السير بيشتغل بس لو مفيش تخصيص بشركة الطيران.</p>
+    <form method="post" id="assignForm">
+        <label>طريقة التخصيص:</label>
+        <select name="assignment_type" id="assignType" onchange="onChange()" style="width:100%;">
+            <option value="airline">حسب شركة الطيران</option>
+            <option value="route">حسب خط السير (منفذ+وجهة)</option>
+        </select>
+
+        <div id="airlineField">
+            <label>شركة الطيران:</label>
+            <input list="airlineList" name="airline" style="width:100%;">
+            <datalist id="airlineList">{% for a in airlines %}<option value="{{ a }}">{% endfor %}</datalist>
+        </div>
+
+        <div id="routeFields" style="display:none;">
+            <label>المنفذ:</label>
+            <input list="portList" name="port" style="width:100%;">
+            <datalist id="portList">{% for p in ports %}<option value="{{ p }}">{% endfor %}</datalist>
+            <label>الوجهة:</label>
+            <input list="destList" name="destination" style="width:100%;">
+            <datalist id="destList">{% for d in destinations %}<option value="{{ d }}">{% endfor %}</datalist>
+        </div>
+
+        <label>مورد الاستثمار:</label>
+        <input list="supplierList" name="supplier" style="width:100%;" required>
+        <datalist id="supplierList">{% for s in suppliers %}<option value="{{ s }}">{% endfor %}</datalist>
+
+        <label>من تاريخ:</label>
+        <input type="date" name="date_from">
+        <label>إلى تاريخ:</label>
+        <input type="date" name="date_to">
+
+        <br><br>
+        <button type="submit" class="btn btn-green">إضافة</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>التخصيصات الحالية</h3>
+    <table>
+        <tr><th>من</th><th>إلى</th><th>شركة الطيران</th><th>خط السير</th><th>المورد</th><th></th></tr>
+        {% for r in rows %}
+        <tr>
+            <td>{{ r.date_from }}</td>
+            <td>{{ r.date_to }}</td>
+            <td>{{ r.airline or '-' }}</td>
+            <td>{{ (r.port + ' → ' + r.destination) if r.port else '-' }}</td>
+            <td>{{ r.supplier }}</td>
+            <td>
+                <form method="post" action="{{ url_for('investment_assignment_delete', row_id=r.id) }}"
+                      onsubmit="return confirm('متأكدة؟');" style="display:inline;">
+                    <button type="submit" class="btn" style="background:#c62828;">حذف</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+<script>
+function onChange() {
+    const isAirline = document.getElementById('assignType').value === 'airline';
+    document.getElementById('airlineField').style.display = isAirline ? 'block' : 'none';
+    document.getElementById('routeFields').style.display = isAirline ? 'none' : 'block';
+}
+onChange();
+</script>
+{% endblock %}

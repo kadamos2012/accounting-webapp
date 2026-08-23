@@ -114,14 +114,31 @@ def lookup_charter_cost_per_seat(cur, flight_number, departure_date, row_already
     return total_cost / seat_count
 
 
-def lookup_investment_supplier(cur, airline, departure_date):
+def lookup_investment_supplier(cur, airline, departure_date, port=None, destination=None):
+    """يحدد مورد الاستثمار: شركة الطيران أولاً (لو فيه تخصيص ليها)، وإلا
+    يرجع لخط السير (منفذ+وجهة) كاحتياطي لو مفيش تخصيص بالطيران"""
     cur.execute("""
         SELECT supplier FROM investment_supplier_assignment
-        WHERE airline = %s AND date_from <= %s AND date_to >= %s
+        WHERE airline = %s AND port IS NULL AND destination IS NULL
+              AND date_from <= %s AND date_to >= %s
         ORDER BY id LIMIT 1
     """, (airline, departure_date, departure_date))
     row = cur.fetchone()
-    return row[0] if row else None
+    if row:
+        return row[0]
+
+    if port and destination:
+        cur.execute("""
+            SELECT supplier FROM investment_supplier_assignment
+            WHERE airline IS NULL AND port = %s AND destination = %s
+                  AND date_from <= %s AND date_to >= %s
+            ORDER BY id LIMIT 1
+        """, (port, destination, departure_date, departure_date))
+        row = cur.fetchone()
+        if row:
+            return row[0]
+
+    return None
 
 
 def calculate_row(cur, name, dob, national_id, passport, port, destination,
@@ -165,7 +182,7 @@ def calculate_row(cur, name, dob, national_id, passport, port, destination,
     total_cost = service_cost_total + ticket_cost
     net_profit = total_sales - total_cost
 
-    investment_supplier = lookup_investment_supplier(cur, airline, departure_date) \
+    investment_supplier = lookup_investment_supplier(cur, airline, departure_date, port, destination) \
         if includes_investment else None
 
     return {

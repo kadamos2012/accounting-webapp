@@ -391,6 +391,58 @@ def noshow_page():
     return render_template("noshow.html", message=message)
 
 
+@app.route("/investment-assignment", methods=["GET", "POST"])
+@login_required
+def investment_assignment_page():
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    if request.method == "POST":
+        assignment_type = request.form.get("assignment_type")
+        supplier = request.form.get("supplier", "").strip()
+        date_from = request.form.get("date_from") or "2020-01-01"
+        date_to = request.form.get("date_to") or "2099-12-31"
+        if assignment_type == "airline":
+            airline = request.form.get("airline", "").strip()
+            cur.execute("""
+                INSERT INTO investment_supplier_assignment(date_from, date_to, airline, supplier)
+                VALUES (%s,%s,%s,%s)
+            """, (date_from, date_to, airline, supplier))
+            log("تخصيص مورد استثمار (شركة طيران)", f"{airline} -> {supplier}")
+        else:
+            port = request.form.get("port", "").strip()
+            dest = request.form.get("destination", "").strip()
+            cur.execute("""
+                INSERT INTO investment_supplier_assignment(date_from, date_to, port, destination, supplier)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (date_from, date_to, port, dest, supplier))
+            log("تخصيص مورد استثمار (خط سير)", f"{port} -> {dest} : {supplier}")
+        conn.commit()
+        flash("تم إضافة التخصيص")
+
+    cur.execute("""
+        SELECT id, date_from, date_to, airline, port, destination, supplier
+        FROM investment_supplier_assignment ORDER BY id DESC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return render_template("investment_assignment.html", rows=rows,
+                            airlines=get_names("airlines"), suppliers=get_names("investment_suppliers"),
+                            ports=get_known_ports(), destinations=get_known_destinations())
+
+
+@app.route("/investment-assignment/<int:row_id>/delete", methods=["POST"])
+@login_required
+def investment_assignment_delete(row_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM investment_supplier_assignment WHERE id = %s", (row_id,))
+    conn.commit()
+    conn.close()
+    log("حذف تخصيص مورد استثمار", f"id={row_id}")
+    flash("تم الحذف")
+    return redirect(url_for("investment_assignment_page"))
+
+
 @app.route("/opening-balances", methods=["GET", "POST"])
 @login_required
 def opening_balances_page():
