@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}نظام المحاسبة{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            color: #222;
+        }
+        .navbar {
+            background: #1F4E78;
+            color: white;
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar a { color: white; text-decoration: none; margin-right: 16px; }
+        .navbar a:hover { text-decoration: underline; }
+        .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .btn {
+            display: inline-block;
+            background: #1F4E78;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+        }
+        .btn:hover { background: #163a5c; }
+        .btn-green { background: #2E7D32; }
+        .btn-green:hover { background: #1b5e20; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { padding: 8px 10px; border: 1px solid #ddd; text-align: center; }
+        th { background: #1F4E78; color: white; }
+        tr:nth-child(even) { background: #f7f7f7; }
+        .flash { background: #fff3cd; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+        input, select {
+            padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+        }
+        label { display: block; margin: 10px 0 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    {% if session.logged_in %}
+    <div class="navbar">
+        <div>
+            <a href="{{ url_for('dashboard') }}">🏠 الرئيسية</a>
+        </div>
+        <div>
+            <a href="{{ url_for('logout') }}">خروج</a>
+        </div>
+    </div>
+    {% endif %}
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

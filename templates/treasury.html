@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}تسجيل حركة خزنة{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>💰 تسجيل حركة خزنة</h2>
+    <form method="post" id="treasuryForm">
+        <label>نوع الحركة:</label>
+        <select name="movement_type" id="movementType" style="width:100%;" onchange="onTypeChange()">
+            {% for mt in movement_types %}
+            <option value="{{ mt }}">{{ mt }}</option>
+            {% endfor %}
+        </select>
+
+        <label>اسم الطرف:</label>
+        <input list="partyList" name="party" id="partyInput" style="width:100%;">
+        <datalist id="partyList"></datalist>
+
+        <label>البيان:</label>
+        <input type="text" name="description" style="width:100%;">
+
+        <label>التاريخ (فارغ = النهاردة):</label>
+        <input type="date" name="date">
+
+        <label>المبلغ:</label>
+        <input type="number" step="0.01" name="amount" required style="width:100%;">
+
+        <div id="directPaymentBox" style="display:none; margin-top:10px;">
+            <label><input type="checkbox" name="direct" id="directCheck" onchange="toggleRelated()"> سداد مباشر (بين العميل والمورد)</label>
+        </div>
+        <div id="partnerBox" style="display:none; margin-top:10px;">
+            <label><input type="checkbox" name="partner_designate" id="partnerCheck" onchange="toggleRelated()"> تخصيص هذا التحصيل لشريك معيّن</label>
+        </div>
+
+        <div id="relatedBox" style="display:none;">
+            <label>الوكيل / الشريك المرتبط:</label>
+            <input list="relatedList" name="related_party" style="width:100%;">
+            <datalist id="relatedList"></datalist>
+        </div>
+
+        <br>
+        <button type="submit" class="btn btn-green">حفظ</button>
+    </form>
+</div>
+
+{% if saved %}
+<div class="card" style="background:#E8F5E9;">
+    ✓ تم حفظ: {{ saved.movement_type }} - {{ saved.party }} - {{ "{:,.0f}".format(saved.amount) }}
+</div>
+{% endif %}
+
+<script>
+const agents = {{ agents|tojson }};
+const airlines = {{ airlines|tojson }};
+const visaSuppliers = {{ visa_suppliers|tojson }};
+const investmentSuppliers = {{ investment_suppliers|tojson }};
+const partners = {{ partners|tojson }};
+const allParties = [...agents, ...airlines, ...visaSuppliers, ...investmentSuppliers, ...partners];
+
+function fillDatalist(id, values) {
+    const dl = document.getElementById(id);
+    dl.innerHTML = '';
+    values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        dl.appendChild(opt);
+    });
+}
+
+function onTypeChange() {
+    const type = document.getElementById('movementType').value;
+    document.getElementById('directPaymentBox').style.display = 'none';
+    document.getElementById('partnerBox').style.display = 'none';
+    document.getElementById('relatedBox').style.display = 'none';
+    document.getElementById('directCheck').checked = false;
+    document.getElementById('partnerCheck').checked = false;
+
+    let partyValues = allParties;
+    if (type === 'تحصيل من عميل') {
+        partyValues = agents;
+        document.getElementById('partnerBox').style.display = 'block';
+    } else if (type === 'سداد لمورد - تأشيرات') {
+        partyValues = visaSuppliers;
+        document.getElementById('directPaymentBox').style.display = 'block';
+    } else if (type === 'سداد لمورد - تذاكر طيران') {
+        partyValues = airlines;
+        document.getElementById('directPaymentBox').style.display = 'block';
+    } else if (type === 'سداد لمورد - استثمار') {
+        partyValues = investmentSuppliers;
+        document.getElementById('directPaymentBox').style.display = 'block';
+    } else if (type === 'توزيع أرباح على شريك') {
+        partyValues = partners;
+    }
+    fillDatalist('partyList', partyValues);
+    fillDatalist('relatedList', [...agents, ...partners]);
+}
+
+function toggleRelated() {
+    const show = document.getElementById('directCheck').checked || document.getElementById('partnerCheck').checked;
+    document.getElementById('relatedBox').style.display = show ? 'block' : 'none';
+}
+
+onTypeChange();
+</script>
+{% endblock %}

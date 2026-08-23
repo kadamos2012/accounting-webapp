@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}استيراد تقديمات اليوم{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>📥 استيراد تقديمات اليوم</h2>
+    <form method="post" enctype="multipart/form-data">
+        <label>اختاري ملف التقديمات (Excel):</label>
+        <input type="file" name="submissions_file" accept=".xlsx" required>
+        <br><br>
+        <button type="submit" class="btn btn-green">استيراد</button>
+    </form>
+</div>
+
+{% if result %}
+    {% if result.success %}
+    <div class="card" style="background: #E8F5E9;">
+        <h3>✓ تم الاستيراد بنجاح</h3>
+        <p>عدد العملاء المضافين: <b>{{ result.added }}</b></p>
+        <p>عدد العملاء المكررين (تم تجاهلهم): <b>{{ result.skipped }}</b></p>
+        <p>تاريخ التقديم المستخدم: <b>{{ result.submit_date }}</b></p>
+        <p>إجمالى قيمة المبيعات: <b>{{ "{:,.0f}".format(result.total_sales_value) }}</b></p>
+        {% if result.package_counts %}
+        <p>تقسيم حسب الباكدج:</p>
+        <ul>
+            {% for pkg, count in result.package_counts.items() %}
+            <li>{{ pkg }}: {{ count }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if result.zero_price_count %}
+        <p style="color: #c62828;">⚠ تحذير: {{ result.zero_price_count }} حجز اتسجل بسعر بيع صفر (ناقص تسعير).</p>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="card" style="background: #FFEBEE;">
+        <h3>✗ فشل الاستيراد</h3>
+        <p>{{ result.error }}</p>
+    </div>
+    {% endif %}
+{% endif %}
+{% endblock %}

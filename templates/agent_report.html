@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}حساب الوكلاء{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>📊 حساب الوكلاء</h2>
+    <table>
+        <tr>
+            <th>اسم الوكيل</th>
+            <th>إجمالى المبيعات</th>
+            <th>إجمالى المحصَّل</th>
+            <th>الرصيد المتبقى</th>
+        </tr>
+        {% for r in results %}
+        <tr>
+            <td>{{ r.agent_name }}</td>
+            <td>{{ "{:,.0f}".format(r.total_sales) }}</td>
+            <td>{{ "{:,.0f}".format(r.total_collected) }}</td>
+            <td>{{ "{:,.0f}".format(r.balance) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

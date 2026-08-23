@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}التقرير الشامل{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>📊 التقرير الشامل</h2>
+    <form method="get" style="display:flex; gap:10px; align-items:end;">
+        <div>
+            <label>من تاريخ:</label>
+            <input type="date" name="from" value="{{ date_from if date_from != '2020-01-01' else '' }}">
+        </div>
+        <div>
+            <label>إلى تاريخ:</label>
+            <input type="date" name="to" value="{{ date_to if date_to != '2099-12-31' else '' }}">
+        </div>
+        <button type="submit" class="btn">تحديث</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>الأرباح والخسائر</h3>
+    <table>
+        <tr><td>إيرادات الفترة</td><td>{{ "{:,.0f}".format(pl.period_revenue) }}</td></tr>
+        <tr><td>إيرادات الأرصدة الافتتاحية</td><td>{{ "{:,.0f}".format(pl.opening_revenue) }}</td></tr>
+        <tr style="font-weight:bold; background:#e3f2fd;"><td>إجمالى الإيرادات</td><td>{{ "{:,.0f}".format(pl.total_revenue) }}</td></tr>
+        <tr><td>تكلفة الفترة</td><td>{{ "{:,.0f}".format(pl.period_cost) }}</td></tr>
+        <tr><td>تكلفة الأرصدة الافتتاحية</td><td>{{ "{:,.0f}".format(pl.opening_cost) }}</td></tr>
+        <tr style="font-weight:bold; background:#e3f2fd;"><td>إجمالى التكلفة</td><td>{{ "{:,.0f}".format(pl.total_cost) }}</td></tr>
+        <tr><td>المصروفات العمومية</td><td>{{ "{:,.0f}".format(pl.general_expenses) }}</td></tr>
+        <tr style="font-weight:bold; background:#c8e6c9;"><td>صافى الربح</td><td>{{ "{:,.0f}".format(pl.net_profit) }}</td></tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3>حساب الوكلاء</h3>
+    <table>
+        <tr><th>الوكيل</th><th>المبيعات</th><th>المحصَّل</th><th>الرصيد</th></tr>
+        {% for r in agent_results %}
+        <tr><td>{{ r.agent_name }}</td><td>{{ "{:,.0f}".format(r.total_sales) }}</td>
+            <td>{{ "{:,.0f}".format(r.total_collected) }}</td><td>{{ "{:,.0f}".format(r.balance) }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>حساب موردى التأشيرات</h3>
+    <table>
+        <tr><th>المورد</th><th>التكلفة</th><th>المسدَّد</th><th>الرصيد</th></tr>
+        {% for r in visa_results %}
+        <tr><td>{{ r.supplier_name }}</td><td>{{ "{:,.0f}".format(r.total_cost) }}</td>
+            <td>{{ "{:,.0f}".format(r.total_paid) }}</td><td>{{ "{:,.0f}".format(r.balance) }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>حساب موردى الاستثمار</h3>
+    <table>
+        <tr><th>المورد</th><th>التكلفة</th><th>المسدَّد</th><th>الرصيد</th></tr>
+        {% for r in investment_results %}
+        <tr><td>{{ r.supplier_name }}</td><td>{{ "{:,.0f}".format(r.total_cost) }}</td>
+            <td>{{ "{:,.0f}".format(r.total_paid) }}</td><td>{{ "{:,.0f}".format(r.balance) }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>حساب شركات الطيران</h3>
+    <table>
+        <tr><th>الشركة</th><th>عدد التذاكر</th><th>التكلفة</th><th>المسدَّد</th><th>الرصيد</th></tr>
+        {% for r in airline_results %}
+        <tr><td>{{ r.airline_name }}</td><td>{{ r.ticket_count }}</td><td>{{ "{:,.0f}".format(r.total_cost) }}</td>
+            <td>{{ "{:,.0f}".format(r.total_paid) }}</td><td>{{ "{:,.0f}".format(r.balance) }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>حساب الشركاء</h3>
+    <table>
+        <tr><th>الشريك</th><th>النسبة</th><th>نصيبه</th><th>الموزَّع</th><th>المتبقى</th></tr>
+        {% for r in partner_results %}
+        <tr><td>{{ r.partner_name }}</td><td>{{ "%.1f"|format(r.share_percentage*100) }}%</td>
+            <td>{{ "{:,.0f}".format(r.entitled) }}</td><td>{{ "{:,.0f}".format(r.distributed) }}</td>
+            <td>{{ "{:,.0f}".format(r.remaining) }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}
