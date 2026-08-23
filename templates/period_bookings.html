@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}فتح حجوزات فترة{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>📅 فتح وتعديل حجوزات فترة</h2>
+    <form method="get">
+        <label>من تاريخ:</label>
+        <input type="date" name="from" value="{{ date_from }}">
+        <label>إلى تاريخ:</label>
+        <input type="date" name="to" value="{{ date_to }}">
+        <button type="submit" class="btn">عرض</button>
+    </form>
+</div>
+
+{% if rows %}
+<div class="card">
+    <form method="post">
+        <input type="hidden" name="save" value="1">
+        <input type="hidden" name="from" value="{{ date_from }}">
+        <input type="hidden" name="to" value="{{ date_to }}">
+        <p>{{ rows|length }} حجز - عدّلي الوكيل أو الباكدج مباشرة فى الجدول ودوسي حفظ فى الآخر</p>
+        <table>
+            <tr>
+                <th>الاسم</th><th>الرقم القومى</th><th>الوكيل</th><th>الباكدج</th>
+                <th>خط السير</th><th>السعر</th><th>التكلفة</th>
+            </tr>
+            {% for r in rows %}
+            <tr style="{{ 'background:#fde0e0;' if r.total_sales <= 0 or r.total_cost <= 0 }}">
+                <td>{{ r.name }}</td>
+                <td>{{ r.national_id }}</td>
+                <td>
+                    <select name="agent_{{ r.id }}">
+                        {% for a in agents %}
+                        <option value="{{ a }}" {{ 'selected' if a == r.agent }}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>
+                    <select name="package_{{ r.id }}">
+                        {% for p in packages %}
+                        <option value="{{ p }}" {{ 'selected' if p == r.package_code }}>{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>{{ r.port }} → {{ r.destination }}</td>
+                <td>{{ "{:,.0f}".format(r.total_sales) }}</td>
+                <td>{{ "{:,.0f}".format(r.total_cost) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        <br>
+        <button type="submit" class="btn btn-green">حفظ التعديلات</button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

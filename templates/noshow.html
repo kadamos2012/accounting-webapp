@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}حالة الغياب{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🚫 تسجيل غياب</h2>
+    <form method="post">
+        <input type="hidden" name="action" value="mark">
+        <label>الرقم القومى:</label>
+        <input type="text" name="national_id" required style="width:100%;">
+        <label>تاريخ المغادرة:</label>
+        <input type="date" name="departure_date" required>
+        <label>الغرامة المدفوعة لشركة الطيران:</label>
+        <input type="number" step="0.01" name="penalty" value="0">
+        <br><br>
+        <button type="submit" class="btn" style="background:#c62828;">تسجيل غياب</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>↩ إلغاء غياب</h2>
+    <form method="post">
+        <input type="hidden" name="action" value="unmark">
+        <label>الرقم القومى:</label>
+        <input type="text" name="national_id" required style="width:100%;">
+        <label>تاريخ المغادرة:</label>
+        <input type="date" name="departure_date" required>
+        <br><br>
+        <button type="submit" class="btn btn-green">إلغاء الغياب</button>
+    </form>
+</div>
+
+{% if message %}
+<div class="card" style="background: {{ '#E8F5E9' if message.success else '#FFEBEE' }};">
+    {{ message.message }}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}كشف حساب طرف{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>📄 كشف حساب طرف معيّن</h2>
+    <form method="post">
+        <label>اسم الطرف:</label>
+        <input list="partyList" name="party" style="width:100%;" value="{{ result.name if result else '' }}">
+        <datalist id="partyList">
+            {% for p in all_parties %}<option value="{{ p }}">{% endfor %}
+        </datalist>
+
+        <label>من تاريخ (فارغ = كل الفترات):</label>
+        <input type="date" name="from">
+        <label>إلى تاريخ:</label>
+        <input type="date" name="to">
+        <br><br>
+        <button type="submit" class="btn">عرض الكشف</button>
+    </form>
+</div>
+
+{% if result %}
+<div class="card">
+    <h3>الملخص - {{ result.name }} ({{ result.entity_type }})</h3>
+    <table>
+        {% for key, value in result.summary.items() %}
+        <tr><td>{{ key }}</td><td>{{ "{:,.0f}".format(value) if value is number else value }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+{% if result.txn_headers %}
+<div class="card">
+    <h3>تفاصيل المعاملات</h3>
+    <table>
+        <tr>{% for h in result.txn_headers %}<th>{{ h }}</th>{% endfor %}</tr>
+        {% for row in result.txn_rows %}
+        <tr>{% for v in row.values() %}<td>{{ "{:,.0f}".format(v) if v is number else v }}</td>{% endfor %}</tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+<div class="card" style="background:#F2F2F2;">
+    <h3>الإجمالى الكلي (كل الفترات - بغض النظر عن الفلتر)</h3>
+    <table>
+        {% for key, value in result.all_time.items() %}
+        <tr><td>{{ key }}</td><td>{{ "{:,.0f}".format(value) if value is number else value }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+{% endblock %}

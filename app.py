@@ -9,6 +9,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from db import get_connection
 import reports
 import import_daily_submissions
+import mark_no_show
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-this-in-production")
@@ -187,6 +188,164 @@ def treasury_page():
 def date_today():
     from datetime import date
     return date.today().isoformat()
+
+
+def detect_entity_type(cur, name):
+    for table, etype in [("agents", "agent"), ("airlines", "airline"),
+                          ("visa_suppliers", "visa"), ("investment_suppliers", "investment"),
+                          ("partners", "partner")]:
+        cur.execute(f"SELECT 1 FROM {table} WHERE name = %s", (name,))
+        if cur.fetchone():
+            return etype
+    return None
+
+
+@app.route("/statement", methods=["GET", "POST"])
+@login_required
+def statement_page():
+    result = None
+    all_parties = get_names("agents") + get_names("airlines") + get_names("visa_suppliers") + \
+                  get_names("investment_suppliers") + get_names("partners")
+    if request.method == "POST":
+        name = request.form.get("party", "").strip()
+        date_from = request.form.get("from") or "2020-01-01"
+        date_to = request.form.get("to") or "2099-12-31"
+
+        conn = get_connection()
+        cur = conn.cursor()
+        entity_type = detect_entity_type(cur, name)
+        if not entity_type:
+            flash(f"لم يتم التعرف على '{name}' كطرف معروف")
+        else:
+            summary = None
+            txn_headers, txn_rows = None, []
+            if entity_type == "agent":
+                summary = reports.get_agent_account(cur, name, date_from, date_to)
+                cur.execute("""
+                    SELECT submission_date, name, national_id, package_code, total_sales
+                    FROM sales WHERE agent = %s AND submission_date BETWEEN %s AND %s
+                    ORDER BY submission_date
+                """, (name, date_from, date_to))
+                txn_headers = ["التاريخ", "اسم العميل", "الرقم القومى", "نوع الخدمة", "المبلغ"]
+                cols = [d[0] for d in cur.description]
+                txn_rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            elif entity_type == "airline":
+                summary = reports.get_airline_account(cur, name, date_from, date_to)
+                cur.execute("""
+                    SELECT departure_date, name, national_id, flight_number, ticket_cost
+                    FROM sales WHERE airline = %s AND departure_date BETWEEN %s AND %s
+                    ORDER BY departure_date
+                """, (name, date_from, date_to))
+                txn_headers = ["تاريخ المغادرة", "اسم العميل", "الرقم القومى", "رقم الرحلة", "تكلفة التذكرة"]
+                cols = [d[0] for d in cur.description]
+                txn_rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            elif entity_type == "visa":
+                summary = reports.get_visa_supplier_account(cur, name, date_from, date_to)
+            elif entity_type == "investment":
+                summary = reports.get_investment_supplier_account(cur, name, date_from, date_to)
+            elif entity_type == "partner":
+                summary = reports.get_partner_account(cur, name, date_from, date_to)
+
+            all_time = None
+            if entity_type == "agent":
+                all_time = reports.get_agent_account(cur, name, "2020-01-01", "2099-12-31")
+            elif entity_type == "airline":
+                all_time = reports.get_airline_account(cur, name, "2020-01-01", "2099-12-31")
+            elif entity_type == "visa":
+                all_time = reports.get_visa_supplier_account(cur, name, "2020-01-01", "2099-12-31")
+            elif entity_type == "investment":
+                all_time = reports.get_investment_supplier_account(cur, name, "2020-01-01", "2099-12-31")
+            elif entity_type == "partner":
+                all_time = reports.get_partner_account(cur, name, "2020-01-01", "2099-12-31")
+
+            result = {"entity_type": entity_type, "name": name, "summary": summary,
+                      "txn_headers": txn_headers, "txn_rows": txn_rows, "all_time": all_time}
+        conn.close()
+
+    return render_template("statement.html", all_parties=all_parties, result=result)
+
+
+@app.route("/noshow", methods=["GET", "POST"])
+@login_required
+def noshow_page():
+    message = None
+    if request.method == "POST":
+        action = request.form.get("action")
+        nid = request.form.get("national_id", "").strip()
+        dep = request.form.get("departure_date", "").strip()
+        if action == "mark":
+            try:
+                penalty = float(request.form.get("penalty", 0))
+            except ValueError:
+                penalty = 0
+            message = mark_no_show.mark_no_show(nid, dep, penalty)
+        else:
+            message = mark_no_show.unmark_no_show(nid, dep)
+    return render_template("noshow.html", message=message)
+
+
+@app.route("/prices/sell", methods=["GET", "POST"])
+@login_required
+def sell_prices_page():
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    if request.method == "POST":
+        for key, value in request.form.items():
+            if key.startswith("price_"):
+                row_id = key.replace("price_", "")
+                try:
+                    price = float(value or 0)
+                except ValueError:
+                    price = 0
+                cur.execute("UPDATE total_sell_prices SET total_price = %s WHERE id = %s", (price, row_id))
+        conn.commit()
+        flash("تم حفظ التعديلات")
+    cur.execute("""
+        SELECT id, date_from, date_to, package_code, port, destination, category, total_price
+        FROM total_sell_prices ORDER BY package_code, port, destination, category
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return render_template("sell_prices.html", rows=rows)
+
+
+@app.route("/bookings/period", methods=["GET", "POST"])
+@login_required
+def period_bookings_page():
+    rows = []
+    date_from = request.values.get("from", "")
+    date_to = request.values.get("to", "")
+    if date_from and date_to:
+        conn = get_connection(dict_cursor=True)
+        cur = conn.cursor()
+        if request.method == "POST" and request.form.get("save") == "1":
+            for key, value in request.form.items():
+                if key.startswith("agent_"):
+                    sid = key.replace("agent_", "")
+                    cur.execute("UPDATE sales SET agent = %s WHERE id = %s", (value, sid))
+                elif key.startswith("package_"):
+                    sid = key.replace("package_", "")
+                    cur.execute("UPDATE sales SET package_code = %s WHERE id = %s", (value, sid))
+            conn.commit()
+            flash("تم حفظ التعديلات")
+        cur.execute("""
+            SELECT id, name, national_id, agent, package_code, port, destination,
+                   flight_number, total_sales, total_cost, airline, departure_date
+            FROM sales WHERE submission_date BETWEEN %s AND %s ORDER BY id
+        """, (date_from, date_to))
+        rows = cur.fetchall()
+        conn.close()
+    return render_template("period_bookings.html", rows=rows, date_from=date_from, date_to=date_to,
+                            agents=get_names("agents"), packages=get_package_codes())
+
+
+def get_package_codes():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT package_code FROM package_definitions ORDER BY id")
+    codes = [r[0] for r in cur.fetchall()]
+    conn.close()
+    return codes
 
 
 if __name__ == "__main__":

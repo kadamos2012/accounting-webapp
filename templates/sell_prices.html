@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}تعديل أسعار البيع{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>💵 تعديل أسعار البيع</h2>
+    <form method="post">
+        <table>
+            <tr>
+                <th>الباكدج</th><th>المنفذ</th><th>الوجهة</th><th>الفئة</th><th>السعر</th>
+            </tr>
+            {% for r in rows %}
+            <tr>
+                <td>{{ r.package_code }}</td>
+                <td>{{ r.port }}</td>
+                <td>{{ r.destination }}</td>
+                <td>{{ r.category }}</td>
+                <td><input type="number" step="0.01" name="price_{{ r.id }}" value="{{ r.total_price }}" style="width:110px;"></td>
+            </tr>
+            {% endfor %}
+        </table>
+        <br>
+        <button type="submit" class="btn btn-green">حفظ كل التعديلات</button>
+    </form>
+</div>
+{% endblock %}
