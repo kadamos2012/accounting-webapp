@@ -171,11 +171,16 @@ MOVEMENT_TYPES = [
 ]
 
 
-def get_names(table):
+def get_names(table, cur=None):
+    def extract(rows):
+        return [r["name"] if isinstance(r, dict) else r[0] for r in rows]
+    if cur is not None:
+        cur.execute(f"SELECT name FROM {table} ORDER BY name")
+        return extract(cur.fetchall())
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(f"SELECT name FROM {table} ORDER BY name")
-    names = [r[0] for r in cur.fetchall()]
+    names = extract(cur.fetchall())
     conn.close()
     return names
 
@@ -224,11 +229,15 @@ def treasury_page():
         else:
             flash("المبلغ لازم يكون أكبر من صفر")
 
-    return render_template("treasury.html", movement_types=MOVEMENT_TYPES,
-                            agents=get_names("agents"), airlines=get_names("airlines"),
-                            visa_suppliers=get_names("visa_suppliers"),
-                            investment_suppliers=get_names("investment_suppliers"),
-                            partners=get_names("partners"), saved=saved)
+    conn = get_connection()
+    cur = conn.cursor()
+    render = render_template("treasury.html", movement_types=MOVEMENT_TYPES,
+                              agents=get_names("agents", cur), airlines=get_names("airlines", cur),
+                              visa_suppliers=get_names("visa_suppliers", cur),
+                              investment_suppliers=get_names("investment_suppliers", cur),
+                              partners=get_names("partners", cur), saved=saved)
+    conn.close()
+    return render
 
 
 def date_today():
@@ -250,8 +259,12 @@ def detect_entity_type(cur, name):
 @login_required
 def statement_page():
     result = None
-    all_parties = get_names("agents") + get_names("airlines") + get_names("visa_suppliers") + \
-                  get_names("investment_suppliers") + get_names("partners")
+    _conn = get_connection()
+    _cur = _conn.cursor()
+    all_parties = get_names("agents", _cur) + get_names("airlines", _cur) + \
+                  get_names("visa_suppliers", _cur) + get_names("investment_suppliers", _cur) + \
+                  get_names("partners", _cur)
+    _conn.close()
     if request.method == "POST":
         name = request.form.get("party", "").strip()
         date_from = request.form.get("from") or "2020-01-01"
@@ -425,10 +438,14 @@ def investment_assignment_page():
         FROM investment_supplier_assignment ORDER BY id DESC
     """)
     rows = cur.fetchall()
+    airlines = get_names("airlines", cur)
+    suppliers = get_names("investment_suppliers", cur)
+    ports = get_known_ports(cur)
+    destinations = get_known_destinations(cur)
     conn.close()
     return render_template("investment_assignment.html", rows=rows,
-                            airlines=get_names("airlines"), suppliers=get_names("investment_suppliers"),
-                            ports=get_known_ports(), destinations=get_known_destinations())
+                            airlines=airlines, suppliers=suppliers,
+                            ports=ports, destinations=destinations)
 
 
 @app.route("/investment-assignment/<int:row_id>/delete", methods=["POST"])
@@ -453,7 +470,7 @@ def opening_balances_page():
     if request.method == "POST":
         section = request.form.get("section")
         if section == "agents":
-            for name in get_names("agents"):
+            for name in get_names("agents", cur):
                 key = name.replace(" ", "_")
                 gross = float(request.form.get(f"gross_{key}", 0) or 0)
                 discount = float(request.form.get(f"discount_{key}", 0) or 0)
@@ -468,7 +485,7 @@ def opening_balances_page():
         elif section in ("visa", "investment"):
             table = "opening_balances_visa" if section == "visa" else "opening_balances_investment"
             ref_table = "visa_suppliers" if section == "visa" else "investment_suppliers"
-            for name in get_names(ref_table):
+            for name in get_names(ref_table, cur):
                 key = name.replace(" ", "_")
                 gross = float(request.form.get(f"gross_{key}", 0) or 0)
                 discount = float(request.form.get(f"discount_{key}", 0) or 0)
@@ -481,7 +498,7 @@ def opening_balances_page():
                         paid = EXCLUDED.paid
                 """, (name, gross, discount, paid))
         elif section == "airlines":
-            for name in get_names("airlines"):
+            for name in get_names("airlines", cur):
                 key = name.replace(" ", "_")
                 revenue = float(request.form.get(f"revenue_{key}", 0) or 0)
                 cost = float(request.form.get(f"cost_{key}", 0) or 0)
@@ -507,13 +524,13 @@ def opening_balances_page():
                             **{c: row.get(c, 0) for c in value_cols}})
         return result
 
-    agents_data = load_section(get_names("agents"), "opening_balances_agents", "agent_name",
+    agents_data = load_section(get_names("agents", cur), "opening_balances_agents", "agent_name",
                                 ["gross_sales", "discount", "collected"])
-    visa_data = load_section(get_names("visa_suppliers"), "opening_balances_visa", "supplier_name",
+    visa_data = load_section(get_names("visa_suppliers", cur), "opening_balances_visa", "supplier_name",
                               ["gross_purchases", "discount", "paid"])
-    investment_data = load_section(get_names("investment_suppliers"), "opening_balances_investment",
+    investment_data = load_section(get_names("investment_suppliers", cur), "opening_balances_investment",
                                     "supplier_name", ["gross_purchases", "discount", "paid"])
-    airlines_data = load_section(get_names("airlines"), "opening_balances_airlines", "airline_name",
+    airlines_data = load_section(get_names("airlines", cur), "opening_balances_airlines", "airline_name",
                                   ["gross_revenue", "gross_cost", "discount", "paid"])
     conn.close()
 
@@ -626,8 +643,9 @@ def service_costs_page():
         FROM service_costs ORDER BY package_code, component, category
     """)
     rows = cur.fetchall()
+    packages = get_package_codes(cur)
     conn.close()
-    return render_template("service_costs.html", rows=rows, packages=get_package_codes())
+    return render_template("service_costs.html", rows=rows, packages=packages)
 
 
 @app.route("/costs/ticket", methods=["GET", "POST"])
@@ -671,9 +689,12 @@ def ticket_costs_page():
         FROM ticket_costs ORDER BY port, destination, airline
     """)
     rows = cur.fetchall()
+    ports = get_known_ports(cur)
+    destinations = get_known_destinations(cur)
+    airlines = get_names("airlines", cur)
     conn.close()
-    return render_template("ticket_costs.html", rows=rows, ports=get_known_ports(),
-                            destinations=get_known_destinations(), airlines=get_names("airlines"))
+    return render_template("ticket_costs.html", rows=rows, ports=ports,
+                            destinations=destinations, airlines=airlines)
 
 
 @app.route("/bookings/period", methods=["GET", "POST"])
@@ -702,33 +723,56 @@ def period_bookings_page():
         """, (date_from, date_to))
         rows = cur.fetchall()
         conn.close()
+        _conn = get_connection()
+        _cur = _conn.cursor()
+        agents = get_names("agents", _cur)
+        packages = get_package_codes(_cur)
+        _conn.close()
+    else:
+        agents = get_names("agents")
+        packages = get_package_codes()
     return render_template("period_bookings.html", rows=rows, date_from=date_from, date_to=date_to,
-                            agents=get_names("agents"), packages=get_package_codes())
+                            agents=agents, packages=packages)
 
 
-def get_package_codes():
+def get_package_codes(cur=None):
+    def extract(rows):
+        return [r["package_code"] if isinstance(r, dict) else r[0] for r in rows]
+    if cur is not None:
+        cur.execute("SELECT package_code FROM package_definitions ORDER BY id")
+        return extract(cur.fetchall())
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT package_code FROM package_definitions ORDER BY id")
-    codes = [r[0] for r in cur.fetchall()]
+    codes = extract(cur.fetchall())
     conn.close()
     return codes
 
 
-def get_known_ports():
+def get_known_ports(cur=None):
+    def extract(rows):
+        return [r["port"] if isinstance(r, dict) else r[0] for r in rows]
+    if cur is not None:
+        cur.execute("SELECT DISTINCT port FROM ticket_costs WHERE port != ''")
+        return extract(cur.fetchall())
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT DISTINCT port FROM ticket_costs WHERE port != ''")
-    ports = [r[0] for r in cur.fetchall()]
+    ports = extract(cur.fetchall())
     conn.close()
     return ports
 
 
-def get_known_destinations():
+def get_known_destinations(cur=None):
+    def extract(rows):
+        return [r["destination"] if isinstance(r, dict) else r[0] for r in rows]
+    if cur is not None:
+        cur.execute("SELECT DISTINCT destination FROM ticket_costs WHERE destination != ''")
+        return extract(cur.fetchall())
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT DISTINCT destination FROM ticket_costs WHERE destination != ''")
-    dests = [r[0] for r in cur.fetchall()]
+    dests = extract(cur.fetchall())
     conn.close()
     return dests
 
@@ -744,9 +788,14 @@ def new_route_page():
         if port and dest and airline:
             result = add_new_route.add_route(port, dest, airline)
             log("إضافة خط سير", f"{port} -> {dest} ({airline})")
+    _conn = get_connection()
+    _cur = _conn.cursor()
+    ports = get_known_ports(_cur)
+    destinations = get_known_destinations(_cur)
+    airlines = get_names("airlines", _cur)
+    _conn.close()
     return render_template("new_route.html", result=result,
-                            ports=get_known_ports(), destinations=get_known_destinations(),
-                            airlines=get_names("airlines"))
+                            ports=ports, destinations=destinations, airlines=airlines)
 
 
 @app.route("/charter", methods=["GET", "POST"])
@@ -793,8 +842,14 @@ def price_change_page():
             add_price_change.add_service_cost_change(package, component, category, value, eff_date)
             result = f"تم تسجيل تكلفة جديدة ({value:,.0f}) سارية من {eff_date}."
             log("تكلفة جديدة", f"{package} / {component} / {category}: {value:,.0f} من {eff_date}")
-    return render_template("price_change.html", result=result, packages=get_package_codes(),
-                            ports=get_known_ports(), destinations=get_known_destinations())
+    _conn = get_connection()
+    _cur = _conn.cursor()
+    packages = get_package_codes(_cur)
+    ports = get_known_ports(_cur)
+    destinations = get_known_destinations(_cur)
+    _conn.close()
+    return render_template("price_change.html", result=result, packages=packages,
+                            ports=ports, destinations=destinations)
 
 
 @app.route("/recalculate", methods=["GET", "POST"])
@@ -988,12 +1043,15 @@ def client_edit_page(client_id):
 
     cur.execute("SELECT * FROM sales WHERE id = %s", (client_id,))
     client = cur.fetchone()
-    conn.close()
     if not client:
+        conn.close()
         flash("العميل غير موجود")
         return redirect(url_for("client_search_page"))
+    agents = get_names("agents", cur)
+    packages = get_package_codes(cur)
+    conn.close()
     return render_template("client_edit.html", client=client,
-                            agents=get_names("agents"), packages=get_package_codes())
+                            agents=agents, packages=packages)
 
 
 if __name__ == "__main__":
