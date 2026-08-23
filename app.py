@@ -932,6 +932,32 @@ def undo_import_page():
     return render_template("undo_import.html", last=last, result=result)
 
 
+@app.route("/delete-day", methods=["GET", "POST"])
+@login_required
+def delete_day_page():
+    result = None
+    preview = None
+    if request.method == "POST":
+        target_date = request.form.get("target_date", "").strip()
+        conn = get_connection(dict_cursor=True)
+        cur = conn.cursor()
+        if request.form.get("action") == "preview":
+            cur.execute("""
+                SELECT id, name, national_id, agent, package_code, total_sales
+                FROM sales WHERE submission_date = %s ORDER BY id
+            """, (target_date,))
+            preview = {"date": target_date, "rows": cur.fetchall()}
+        elif request.form.get("action") == "confirm_delete":
+            cur.execute("SELECT COUNT(*) AS cnt FROM sales WHERE submission_date = %s", (target_date,))
+            count = cur.fetchone()["cnt"]
+            cur.execute("DELETE FROM sales WHERE submission_date = %s", (target_date,))
+            conn.commit()
+            log("حذف تقديمات يوم", f"حذف {count} حجز بتاريخ تقديم {target_date}")
+            result = {"deleted": count, "date": target_date}
+        conn.close()
+    return render_template("delete_day.html", result=result, preview=preview)
+
+
 @app.route("/activity-log")
 @login_required
 @admin_required

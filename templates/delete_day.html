@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}حذف تقديمات يوم{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🗑 حذف تقديمات يوم بالكامل</h2>
+    <p style="color:#c62828;">⚠ العملية دي بتحذف كل الحجوزات اللي تاريخ تقديمها هو اليوم المحدد - مفيش تراجع بعدها.</p>
+    <form method="post">
+        <input type="hidden" name="action" value="preview">
+        <label>تاريخ التقديم:</label>
+        <input type="date" name="target_date" required>
+        <br><br>
+        <button type="submit" class="btn">عرض الحجوزات الأول</button>
+    </form>
+</div>
+
+{% if preview %}
+<div class="card">
+    <h3>{{ preview.rows|length }} حجز بتاريخ تقديم {{ preview.date }}</h3>
+    <table>
+        <tr><th>الاسم</th><th>الرقم القومى</th><th>الوكيل</th><th>الباكدج</th><th>السعر</th></tr>
+        {% for r in preview.rows %}
+        <tr>
+            <td>{{ r.name }}</td><td>{{ r.national_id }}</td><td>{{ r.agent }}</td>
+            <td>{{ r.package_code }}</td><td>{{ "{:,.0f}".format(r.total_sales) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% if preview.rows %}
+    <form method="post" onsubmit="return confirm('متأكدة إنك عايزة تحذفي كل الـ{{ preview.rows|length }} حجز دول؟ العملية مش قابلة للتراجع.');">
+        <input type="hidden" name="action" value="confirm_delete">
+        <input type="hidden" name="target_date" value="{{ preview.date }}">
+        <button type="submit" class="btn" style="background:#c62828;">
+            حذف كل الـ{{ preview.rows|length }} حجز دول نهائيًا
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if result %}
+<div class="card" style="background:#E8F5E9;">
+    تم حذف {{ result.deleted }} حجز بتاريخ تقديم {{ result.date }}.
+</div>
+{% endif %}
+{% endblock %}
