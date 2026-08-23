@@ -10,6 +10,11 @@ from db import get_connection
 import reports
 import import_daily_submissions
 import mark_no_show
+import add_new_route
+import add_charter_booking
+import add_price_change
+import health_check
+import undo_last_import
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-this-in-production")
@@ -346,6 +351,102 @@ def get_package_codes():
     codes = [r[0] for r in cur.fetchall()]
     conn.close()
     return codes
+
+
+def get_known_ports():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT port FROM ticket_costs WHERE port != ''")
+    ports = [r[0] for r in cur.fetchall()]
+    conn.close()
+    return ports
+
+
+def get_known_destinations():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT destination FROM ticket_costs WHERE destination != ''")
+    dests = [r[0] for r in cur.fetchall()]
+    conn.close()
+    return dests
+
+
+@app.route("/routes/new", methods=["GET", "POST"])
+@login_required
+def new_route_page():
+    result = None
+    if request.method == "POST":
+        port = request.form.get("port", "").strip()
+        dest = request.form.get("destination", "").strip()
+        airline = request.form.get("airline", "").strip()
+        if port and dest and airline:
+            result = add_new_route.add_route(port, dest, airline)
+    return render_template("new_route.html", result=result,
+                            ports=get_known_ports(), destinations=get_known_destinations(),
+                            airlines=get_names("airlines"))
+
+
+@app.route("/charter", methods=["GET", "POST"])
+@login_required
+def charter_page():
+    result = None
+    if request.method == "POST":
+        flight = request.form.get("flight_number", "").strip()
+        dep = request.form.get("departure_date", "").strip()
+        airline = request.form.get("airline", "").strip()
+        try:
+            cost = float(request.form.get("total_cost", 0))
+        except ValueError:
+            cost = 0
+        result = add_charter_booking.add_booking(flight, dep, airline, cost)
+        if result["success"] and request.form.get("recalculate"):
+            recalc = add_charter_booking.recalculate_flight(flight, dep)
+            result["message"] += f" تم إعادة حساب {recalc['updated']} حجز موجود بالفعل على هذه الرحلة."
+    return render_template("charter.html", result=result, airlines=get_names("airlines"))
+
+
+@app.route("/prices/change", methods=["GET", "POST"])
+@login_required
+def price_change_page():
+    result = None
+    if request.method == "POST":
+        change_type = request.form.get("change_type")
+        package = request.form.get("package", "").strip()
+        category = request.form.get("category", "").strip()
+        eff_date = request.form.get("effective_date", "").strip()
+        try:
+            value = float(request.form.get("value", 0))
+        except ValueError:
+            value = 0
+        if change_type == "sell":
+            port = request.form.get("port", "").strip()
+            dest = request.form.get("destination", "").strip()
+            add_price_change.add_sell_price_change(package, port, dest, category, value, eff_date)
+            result = f"تم تسجيل سعر بيع جديد ({value:,.0f}) سارٍ من {eff_date}."
+        else:
+            component = request.form.get("component", "").strip()
+            add_price_change.add_service_cost_change(package, component, category, value, eff_date)
+            result = f"تم تسجيل تكلفة جديدة ({value:,.0f}) سارية من {eff_date}."
+    return render_template("price_change.html", result=result, packages=get_package_codes(),
+                            ports=get_known_ports(), destinations=get_known_destinations())
+
+
+@app.route("/health-check")
+@login_required
+def health_check_page():
+    issues = health_check.run_health_check()
+    return render_template("health_check.html", issues=issues)
+
+
+@app.route("/undo-import", methods=["GET", "POST"])
+@login_required
+def undo_import_page():
+    last = undo_last_import.get_last_import()
+    result = None
+    if request.method == "POST":
+        result = undo_last_import.undo_last_import()
+        last = undo_last_import.get_last_import()
+    return render_template("undo_import.html", last=last, result=result)
 
 
 if __name__ == "__main__":

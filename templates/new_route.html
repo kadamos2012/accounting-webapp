@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}إضافة خط سير جديد{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🗺 إضافة خط سير جديد</h2>
+    <form method="post">
+        <label>المنفذ:</label>
+        <input list="portList" name="port" style="width:100%;" required>
+        <datalist id="portList">{% for p in ports %}<option value="{{ p }}">{% endfor %}</datalist>
+
+        <label>جهة المغادرة:</label>
+        <input list="destList" name="destination" style="width:100%;" required>
+        <datalist id="destList">{% for d in destinations %}<option value="{{ d }}">{% endfor %}</datalist>
+
+        <label>شركة الطيران:</label>
+        <input list="airlineList" name="airline" style="width:100%;" required>
+        <datalist id="airlineList">{% for a in airlines %}<option value="{{ a }}">{% endfor %}</datalist>
+
+        <br><br>
+        <button type="submit" class="btn btn-green">إضافة</button>
+    </form>
+</div>
+{% if result %}
+<div class="card" style="background: {{ '#FFF3E0' if result.scenario == 'same_route_new_airline' else '#E8F5E9' }};">
+    {% if result.scenario == 'same_route_new_airline' %}
+    <p>هذا خط سير موجود بالفعل - أُضيفت تكلفة الشراء الخاصة بالشركة الجديدة فقط. أسعار البيع موجودة بالفعل.</p>
+    {% else %}
+    <p>خط سير جديد تمامًا - أُضيف {{ result.sell_prices_added }} صف فى جدول سعر البيع (كلهم بسعر صفر افتراضيًا).</p>
+    <p>الخطوات التالية: املأ تكلفة الشراء (تعديل تكلفة التذاكر) وسعر البيع (تعديل أسعار البيع).</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

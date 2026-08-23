@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}التراجع عن آخر استيراد{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>↩ التراجع عن آخر استيراد</h2>
+    {% if last %}
+    <p>آخر استيراد: <b>{{ last[2] }}</b></p>
+    <p>التاريخ: {{ last[1] }}</p>
+    <p>عدد العملاء المضافين: <b>{{ last[3] }}</b></p>
+    <form method="post" onsubmit="return confirm('متأكدة إنك عايزة تتراجعي عن الاستيراد ده؟');">
+        <button type="submit" class="btn" style="background:#c62828;">تراجع الآن</button>
+    </form>
+    {% else %}
+    <p>لا يوجد سجل استيراد سابق.</p>
+    {% endif %}
+</div>
+{% if result %}
+<div class="card" style="background: {{ '#E8F5E9' if result.success else '#FFEBEE' }};">
+    {% if result.success %}
+    تم حذف {{ result.removed }} عميل من استيراد '{{ result.source_file }}'.
+    {% else %}
+    {{ result.error }}
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

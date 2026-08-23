@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}فحص الصحة{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🩺 فحص صحة قاعدة البيانات</h2>
+    {% if not issues %}
+    <p style="color:#2E7D32; font-size:18px;">✓ لا توجد مشاكل. كل حاجة متسقة.</p>
+    {% else %}
+    <p>تم العثور على {{ issues|length }} نوع مشكلة:</p>
+    {% for title, count, explanation in issues %}
+    <div class="card" style="background:#FFF3E0;">
+        <b>⚠ {{ title }}: {{ count }}</b>
+        <p style="color:#555;">{{ explanation }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}
