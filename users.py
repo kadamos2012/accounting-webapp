@@ -7,13 +7,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_connection
 
 
-def create_user(username, password, display_name="", is_admin=False):
+def create_user(username, password, display_name="", is_admin=False, gender="female"):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO users(username, password_hash, display_name, is_admin)
-        VALUES (%s, %s, %s, %s)
-    """, (username, generate_password_hash(password), display_name or username, int(is_admin)))
+        INSERT INTO users(username, password_hash, display_name, is_admin, gender)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (username, generate_password_hash(password), display_name or username, int(is_admin), gender))
     conn.commit()
     conn.close()
 
@@ -42,7 +42,7 @@ def change_password(username, new_password):
 def list_users():
     conn = get_connection(dict_cursor=True)
     cur = conn.cursor()
-    cur.execute("SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY id")
+    cur.execute("SELECT id, username, display_name, is_admin, gender, created_at FROM users ORDER BY id")
     users = cur.fetchall()
     conn.close()
     return users

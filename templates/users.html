@@ -8,6 +8,11 @@
         <input type="text" name="username" required style="width:100%;">
         <label>الاسم الظاهر:</label>
         <input type="text" name="display_name" style="width:100%;">
+        <label>الجنس (عشان رسائل النظام تخاطبه صح):</label>
+        <select name="gender" style="width:100%;">
+            <option value="female">أنثى</option>
+            <option value="male">ذكر</option>
+        </select>
         <label>كلمة السر:</label>
         <input type="password" name="password" required style="width:100%;">
         <label><input type="checkbox" name="is_admin"> مدير (يقدر يشوف سجل النشاط ويضيف مستخدمين)</label>
@@ -22,11 +27,12 @@
 <div class="card">
     <h3>المستخدمين الحاليين</h3>
     <table>
-        <tr><th>اسم المستخدم</th><th>الاسم الظاهر</th><th>مدير؟</th><th>تاريخ الإنشاء</th></tr>
+        <tr><th>اسم المستخدم</th><th>الاسم الظاهر</th><th>الجنس</th><th>مدير؟</th><th>تاريخ الإنشاء</th></tr>
         {% for u in all_users %}
         <tr>
             <td>{{ u.username }}</td>
             <td>{{ u.display_name }}</td>
+            <td>{{ 'أنثى' if u.gender == 'female' else 'ذكر' }}</td>
             <td>{{ 'نعم' if u.is_admin else 'لا' }}</td>
             <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
         </tr>

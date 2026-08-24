@@ -26,6 +26,24 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-this-in-production")
 
 
+def gform(male_form, female_form):
+    """يرجّع الصيغة الصحيحة (مذكر/مؤنث) حسب جنس المستخدم المسجّل دخوله دلوقتي -
+    تُستخدم فى القوالب كده: {{ gform('جاهز', 'جاهزة') }}
+    (الاسم مش 'g' عشان g محجوز فعليًا فى Flask لكائن السياق الخاص بيه)"""
+    return female_form if session.get("gender", "female") == "female" else male_form
+
+
+app.jinja_env.globals["gform"] = gform
+
+
+def greeting_name():
+    """اسم المستخدم الحالي لمخاطبته به فى الرسائل، أو 'صديقى/صديقتى' لو مفيش اسم مسجّل"""
+    return session.get("display_name") or gform("صديقى", "صديقتى")
+
+
+app.jinja_env.globals["greeting_name"] = greeting_name
+
+
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -61,6 +79,7 @@ def login():
             session["username"] = user["username"]
             session["display_name"] = user["display_name"]
             session["is_admin"] = bool(user["is_admin"])
+            session["gender"] = user.get("gender") or "female"
             users_module.log_activity(username, "تسجيل دخول")
             return redirect(url_for("dashboard"))
         flash("اسم المستخدم أو كلمة السر غلط")
@@ -1013,9 +1032,10 @@ def users_page():
         password = request.form.get("password", "").strip()
         display_name = request.form.get("display_name", "").strip()
         is_admin = bool(request.form.get("is_admin"))
+        gender = request.form.get("gender", "female")
         if username and password:
             try:
-                users_module.create_user(username, password, display_name, is_admin)
+                users_module.create_user(username, password, display_name, is_admin, gender)
                 log("إضافة مستخدم", f"أضاف مستخدم جديد: {username}")
                 message = f"تم إنشاء المستخدم '{username}' بنجاح."
             except Exception as e:

@@ -236,6 +236,7 @@ CREATE TABLE users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     display_name TEXT,
+    gender TEXT DEFAULT 'female',
     is_admin INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW()
 );
