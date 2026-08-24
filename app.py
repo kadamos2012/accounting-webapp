@@ -774,18 +774,93 @@ def period_bookings_page():
         conn = get_connection(dict_cursor=True)
         cur = conn.cursor()
         if request.method == "POST" and request.form.get("save") == "1":
-            for key, value in request.form.items():
-                if key.startswith("agent_"):
-                    sid = key.replace("agent_", "")
-                    cur.execute("UPDATE sales SET agent = %s WHERE id = %s", (value, sid))
-                elif key.startswith("package_"):
-                    sid = key.replace("package_", "")
-                    cur.execute("UPDATE sales SET package_code = %s WHERE id = %s", (value, sid))
+            updated = 0
+            overridden = 0
+            row_ids = set()
+            for key in request.form:
+                for prefix in ("agent_", "package_", "sales_", "visa_", "investment_", "ticket_"):
+                    if key.startswith(prefix):
+                        row_ids.add(key[len(prefix):])
+
+            for sid in row_ids:
+                new_agent = request.form.get(f"agent_{sid}")
+                new_package = request.form.get(f"package_{sid}")
+                manual_sales = request.form.get(f"sales_{sid}")
+                manual_visa = request.form.get(f"visa_{sid}")
+                manual_investment = request.form.get(f"investment_{sid}")
+                manual_ticket = request.form.get(f"ticket_{sid}")
+
+                cur.execute("""
+                    SELECT name, date_of_birth, national_id, passport_number, port, destination,
+                           flight_number, departure_date, submission_date, agent, category,
+                           package_code, total_sales, visa_cost, investment_cost, ticket_cost
+                    FROM sales WHERE id = %s
+                """, (sid,))
+                row = cur.fetchone()
+                if not row:
+                    continue
+
+                agent = new_agent if new_agent is not None else row["agent"]
+                package_code = new_package if new_package is not None else row["package_code"]
+
+                def parse_or(val, fallback):
+                    try:
+                        return float(val)
+                    except (TypeError, ValueError):
+                        return fallback
+
+                manually_touched = any(v not in (None, "") for v in
+                                        [manual_sales, manual_visa, manual_investment, manual_ticket])
+
+                if manually_touched:
+                    # تعديل يدوي مباشر على أي رقم (سعر بيع أو أي تكلفة) - يُحترم
+                    # كما هو بالظبط، من غير إعادة حساب تلقائية تلغيه
+                    total_sales = parse_or(manual_sales, row["total_sales"])
+                    visa_cost = parse_or(manual_visa, row["visa_cost"])
+                    investment_cost = parse_or(manual_investment, row["investment_cost"])
+                    ticket_cost = parse_or(manual_ticket, row["ticket_cost"])
+                    total_cost = visa_cost + investment_cost + ticket_cost
+                    cur.execute("""
+                        UPDATE sales SET agent = %s, package_code = %s,
+                            total_sales = %s, visa_cost = %s, investment_cost = %s,
+                            ticket_cost = %s, service_cost_total = %s, total_cost = %s,
+                            net_profit = %s
+                        WHERE id = %s
+                    """, (agent, package_code, total_sales, visa_cost, investment_cost, ticket_cost,
+                          visa_cost + investment_cost, total_cost, total_sales - total_cost, sid))
+                    overridden += 1
+                else:
+                    # مفيش تعديل يدوي على أي رقم - نعيد الحساب تلقائيًا لو الوكيل
+                    # أو الباكدج اتغيّروا (أو حتى لو مفيش تغيير، بيرجّع نفس القيم)
+                    from pricing_engine import calculate_row
+                    import psycopg2.extensions
+                    plain_cur = conn.cursor(cursor_factory=psycopg2.extensions.cursor)
+                    recalculated = calculate_row(
+                        plain_cur, row["name"], row["date_of_birth"], row["national_id"],
+                        row["passport_number"], row["port"], row["destination"],
+                        row["flight_number"], row["departure_date"], row["submission_date"],
+                        agent, row["category"], package_code, row_already_in_db=True
+                    )
+                    cur.execute("""
+                        UPDATE sales SET
+                            agent = %(agent)s, package_code = %(package_code)s,
+                            service_price = %(service_price)s, ticket_price = %(ticket_price)s,
+                            total_sales = %(total_sales)s, visa_cost = %(visa_cost)s,
+                            investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,
+                            service_cost_total = %(service_cost_total)s, ticket_cost = %(ticket_cost)s,
+                            total_cost = %(total_cost)s, net_profit = %(net_profit)s,
+                            investment_supplier = %(investment_supplier)s
+                        WHERE id = %(sid)s
+                    """, {**recalculated, "sid": sid})
+                    updated += 1
             conn.commit()
-            flash("تم حفظ التعديلات")
+            log("تعديل حجوزات فترة", f"{updated} أعيد حسابهم تلقائيًا, {overridden} بتعديل يدوي مباشر")
+            flash(f"تم الحفظ: {updated} أعيد حسابهم تلقائيًا، {overridden} بتعديل يدوي مباشر على السعر/التكلفة")
+
         cur.execute("""
             SELECT id, name, national_id, agent, package_code, port, destination,
-                   flight_number, total_sales, total_cost, airline, departure_date
+                   flight_number, total_sales, visa_cost, investment_cost, ticket_cost,
+                   total_cost, airline, departure_date
             FROM sales WHERE submission_date BETWEEN %s AND %s ORDER BY id
         """, (date_from, date_to))
         rows = cur.fetchall()
