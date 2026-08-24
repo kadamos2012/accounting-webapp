@@ -958,9 +958,7 @@ def sales_by_period_page():
 
 @app.route("/reports/treasury")
 @login_required
-def treasury_report_page():
-    date_from = request.args.get("from", "2020-01-01")
-    date_to = request.args.get("to", "2099-12-31")
+def _compute_treasury_report(date_from, date_to):
     conn = get_connection(dict_cursor=True)
     cur = conn.cursor()
     balances = reports.get_account_balances(cur, date_from, date_to)
@@ -978,8 +976,27 @@ def treasury_report_page():
         processed.append({**m, "affects_cash": not is_direct,
                             "running_balance": running_by_account.get(acct, 0)})
     conn.close()
+    return processed, balances
+
+
+def treasury_report_page():
+    date_from = request.args.get("from", "2020-01-01")
+    date_to = request.args.get("to", "2099-12-31")
+    processed, balances = _compute_treasury_report(date_from, date_to)
     return render_template("treasury_report.html", movements=processed, balances=balances,
                             date_from=date_from, date_to=date_to)
+
+
+@app.route("/reports/treasury/download")
+@login_required
+def treasury_report_download():
+    date_from = request.args.get("from", "2020-01-01")
+    date_to = request.args.get("to", "2099-12-31")
+    processed, balances = _compute_treasury_report(date_from, date_to)
+    buf = excel_export.build_treasury_report_xlsx(processed, balances, date_from, date_to)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    return send_file(buf, as_attachment=True, download_name=f"تقرير_حركة_الخزنة_{timestamp}.xlsx",
+                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.route("/health-check")

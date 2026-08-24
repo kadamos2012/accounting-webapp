@@ -161,6 +161,72 @@ def clean_filename(s):
     return s.strip()
 
 
+def build_treasury_report_xlsx(movements, balances, date_from, date_to):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "حركة الخزنة"
+    ws.sheet_view.rightToLeft = True
+    ws.sheet_view.showGridLines = False
+    for col, w in zip("ABCDEFGHI", [12, 30, 20, 20, 12, 14, 14, 14, 16]):
+        ws.column_dimensions[col].width = w
+
+    ws.merge_cells("A1:I1")
+    c = ws.cell(row=1, column=1, value=f"تقرير حركة الخزنة ({date_from} إلى {date_to})")
+    c.font = TITLE_FONT
+    c.fill = HEADER_FILL
+    ws.row_dimensions[1].height = 28
+
+    r = 3
+    summary_rows = [
+        ("💵 رصيد النقدي", balances["نقدي"]),
+        ("🏦 رصيد البنك", balances["بنك"]),
+        ("الإجمالى", balances["الإجمالى"]),
+    ]
+    for label, val in summary_rows:
+        ws.cell(row=r, column=1, value=label).font = BLACK_BOLD
+        ws.cell(row=r, column=1).alignment = RIGHT
+        ws.cell(row=r, column=1).border = BORDER
+        vc = ws.cell(row=r, column=2, value=val)
+        vc.font = BLACK_BOLD
+        vc.fill = GREEN_FILL
+        vc.border = BORDER
+        vc.number_format = "#,##0"
+        r += 1
+
+    r += 1
+    headers = ["التاريخ", "البيان", "نوع الحركة", "الطرف", "الحساب",
+                "وارد", "منصرف", "يؤثر على الخزنة؟", "الرصيد الجاري"]
+    for i, h in enumerate(headers, start=1):
+        hc = ws.cell(row=r, column=i, value=h)
+        hc.fill = HEADER_FILL
+        hc.font = HEADER_FONT
+        hc.alignment = CENTER
+        hc.border = BORDER
+    r += 1
+
+    for m in movements:
+        row = [
+            m["transaction_date"], m["description"], m["movement_type"], m["party_name"] or "-",
+            m.get("account_type") or "نقدي",
+            m["incoming"] or 0, m["outgoing"] or 0,
+            "نعم" if m["affects_cash"] else "لا (مباشر)",
+            m["running_balance"] if m["affects_cash"] else None,
+        ]
+        for i, val in enumerate(row, start=1):
+            cell = ws.cell(row=r, column=i, value=val)
+            cell.border = BORDER
+            cell.alignment = CENTER
+            cell.font = BLACK
+            if isinstance(val, (int, float)):
+                cell.number_format = "#,##0"
+        r += 1
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
 def build_statement_xlsx(entity_name, entity_type, summary, txn_headers, txn_rows, all_time):
     wb = Workbook()
     ws = wb.active
