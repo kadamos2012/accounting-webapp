@@ -10,7 +10,8 @@
     <form method="post">
         <table>
             <tr>
-                <th>الباكدج</th><th>المنفذ</th><th>الوجهة</th><th>الفئة</th><th>السعر</th>
+                <th>الباكدج</th><th>المنفذ</th><th>الوجهة</th><th>الفئة</th>
+                <th>سارٍ من</th><th>سارٍ إلى</th><th>السعر</th>
             </tr>
             {% for r in rows %}
             <tr>
@@ -18,6 +19,8 @@
                 <td>{{ r.port }}</td>
                 <td>{{ r.destination }}</td>
                 <td>{{ r.category }}</td>
+                <td><input type="date" name="from_{{ r.id }}" value="{{ r.date_from }}" style="width:135px;"></td>
+                <td><input type="date" name="to_{{ r.id }}" value="{{ r.date_to }}" style="width:135px;"></td>
                 <td><input type="number" step="0.01" name="price_{{ r.id }}" value="{{ r.total_price }}" style="width:110px;"></td>
             </tr>
             {% endfor %}

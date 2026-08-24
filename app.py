@@ -613,6 +613,12 @@ def sell_prices_page():
                     price = 0
                 cur.execute("UPDATE total_sell_prices SET total_price = %s WHERE id = %s", (price, row_id))
                 changed += 1
+            elif key.startswith("from_"):
+                row_id = key.replace("from_", "")
+                cur.execute("UPDATE total_sell_prices SET date_from = %s WHERE id = %s", (value, row_id))
+            elif key.startswith("to_"):
+                row_id = key.replace("to_", "")
+                cur.execute("UPDATE total_sell_prices SET date_to = %s WHERE id = %s", (value, row_id))
         conn.commit()
         flash("تم حفظ التعديلات")
         log("تعديل أسعار البيع", f"عدّل {changed} صف/صفوف فى جدول أسعار البيع")
@@ -652,6 +658,12 @@ def service_costs_page():
                         cost = 0
                     cur.execute("UPDATE service_costs SET cost = %s WHERE id = %s", (cost, row_id))
                     changed += 1
+                elif key.startswith("from_"):
+                    row_id = key.replace("from_", "")
+                    cur.execute("UPDATE service_costs SET date_from = %s WHERE id = %s", (value, row_id))
+                elif key.startswith("to_"):
+                    row_id = key.replace("to_", "")
+                    cur.execute("UPDATE service_costs SET date_to = %s WHERE id = %s", (value, row_id))
             conn.commit()
             flash("تم حفظ التعديلات")
             log("تعديل تكلفة خدمات", f"عدّل {changed} صف/صفوف")
@@ -698,6 +710,12 @@ def ticket_costs_page():
                             cost = 0
                         cur.execute(f"UPDATE ticket_costs SET {col} = %s WHERE id = %s", (cost, row_id))
                         changed += 1
+                if key.startswith("from_"):
+                    row_id = key.replace("from_", "")
+                    cur.execute("UPDATE ticket_costs SET date_from = %s WHERE id = %s", (value, row_id))
+                elif key.startswith("to_"):
+                    row_id = key.replace("to_", "")
+                    cur.execute("UPDATE ticket_costs SET date_to = %s WHERE id = %s", (value, row_id))
             conn.commit()
             flash("تم حفظ التعديلات")
             log("تعديل تكلفة تذاكر", f"عدّل {changed} قيمة/قيم")

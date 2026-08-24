@@ -27,12 +27,15 @@
     <h2>تعديل التكاليف الحالية</h2>
     <form method="post">
         <table>
-            <tr><th>المنفذ</th><th>الوجهة</th><th>شركة الطيران</th><th>بالغ</th><th>أنثى</th><th>طفل</th><th>رضيع</th></tr>
+            <tr><th>المنفذ</th><th>الوجهة</th><th>شركة الطيران</th><th>سارٍ من</th><th>سارٍ إلى</th>
+                <th>بالغ</th><th>أنثى</th><th>طفل</th><th>رضيع</th></tr>
             {% for r in rows %}
             <tr>
                 <td>{{ r.port }}</td>
                 <td>{{ r.destination }}</td>
                 <td>{{ r.airline }}</td>
+                <td><input type="date" name="from_{{ r.id }}" value="{{ r.date_from }}" style="width:135px;"></td>
+                <td><input type="date" name="to_{{ r.id }}" value="{{ r.date_to }}" style="width:135px;"></td>
                 <td><input type="number" step="0.01" name="adult_{{ r.id }}" value="{{ r.cost_adult }}" style="width:90px;"></td>
                 <td><input type="number" step="0.01" name="female_{{ r.id }}" value="{{ r.cost_female }}" style="width:90px;"></td>
                 <td><input type="number" step="0.01" name="child_{{ r.id }}" value="{{ r.cost_child }}" style="width:90px;"></td>

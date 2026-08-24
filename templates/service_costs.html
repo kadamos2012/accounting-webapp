@@ -28,12 +28,14 @@
     <h2>تعديل التكاليف الحالية</h2>
     <form method="post">
         <table>
-            <tr><th>الباكدج</th><th>المكوّن</th><th>الفئة</th><th>التكلفة</th></tr>
+            <tr><th>الباكدج</th><th>المكوّن</th><th>الفئة</th><th>سارٍ من</th><th>سارٍ إلى</th><th>التكلفة</th></tr>
             {% for r in rows %}
             <tr>
                 <td>{{ r.package_code }}</td>
                 <td>{{ r.component }}</td>
                 <td>{{ r.category }}</td>
+                <td><input type="date" name="from_{{ r.id }}" value="{{ r.date_from }}" style="width:135px;"></td>
+                <td><input type="date" name="to_{{ r.id }}" value="{{ r.date_to }}" style="width:135px;"></td>
                 <td><input type="number" step="0.01" name="cost_{{ r.id }}" value="{{ r.cost }}" style="width:110px;"></td>
             </tr>
             {% endfor %}
