@@ -19,6 +19,7 @@ import undo_last_import
 import excel_export
 import users as users_module
 import recalculate_period
+import populate_sell_price_rows
 from flask import send_file
 
 app = Flask(__name__)
@@ -578,6 +579,22 @@ def packages_page():
     rows = cur.fetchall()
     conn.close()
     return render_template("packages.html", rows=rows)
+
+
+@app.route("/prices/sell/populate", methods=["GET", "POST"])
+@login_required
+def populate_sell_prices_page():
+    result = None
+    if request.method == "POST":
+        selected = request.form.getlist("combo")
+        keys = [tuple(k.split("||")) for k in selected]
+        if keys:
+            result = populate_sell_price_rows.apply_missing_combos(keys)
+            log("تجهيز صفوف أسعار البيع", f"أضاف {result['added']} تركيبة جديدة بسعر صفر")
+        else:
+            flash("من فضلك اختاري تركيبة واحدة على الأقل")
+    combos = populate_sell_price_rows.preview_missing_combos()
+    return render_template("populate_sell_prices.html", combos=combos, result=result)
 
 
 @app.route("/prices/sell", methods=["GET", "POST"])

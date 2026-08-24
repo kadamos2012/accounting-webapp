@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}تجهيز صفوف أسعار البيع{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🧩 تجهيز صفوف أسعار البيع من البيانات الموجودة</h2>
+    <p style="color:#555;">القائمة دي بتوضح كل تركيبة (باكدج + خط سير + فئة) موجودة فعليًا فى
+        حجوزاتك بس <b>لسه مالهاش صف فى جدول أسعار البيع خالص</b>. اختاري اللي عايزة تضيفيها
+        (هتتضاف بسعر صفر، وبعدين تروحي "تعديل أسعار البيع" وتكتبي الرقم الحقيقي).</p>
+
+    {% if combos %}
+    <form method="post">
+        <table>
+            <tr>
+                <th><input type="checkbox" onclick="document.querySelectorAll('.combo-check').forEach(c=>c.checked=this.checked)"></th>
+                <th>الباكدج</th><th>المنفذ</th><th>الوجهة</th><th>الفئة</th><th>عدد الحجوزات</th>
+            </tr>
+            {% for c in combos %}
+            <tr>
+                <td><input type="checkbox" class="combo-check" name="combo"
+                           value="{{ c.package_code }}||{{ c.port }}||{{ c.destination }}||{{ c.category }}" checked></td>
+                <td>{{ c.package_code }}</td>
+                <td>{{ c.port }}</td>
+                <td>{{ c.destination }}</td>
+                <td>{{ c.category }}</td>
+                <td>{{ c.usage_count }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        <br>
+        <button type="submit" class="btn btn-green">إضافة المحدد بسعر صفر</button>
+    </form>
+    {% else %}
+    <p style="color:#2E7D32;">✓ مفيش تركيبات ناقصة - كل التركيبات الموجودة فى حجوزاتك ليها صف فى جدول أسعار البيع بالفعل.</p>
+    {% endif %}
+</div>
+
+{% if result %}
+<div class="card" style="background:#E8F5E9;">
+    تم إضافة {{ result.added }} تركيبة بسعر صفر.
+    <a href="{{ url_for('sell_prices_page') }}" class="btn btn-green" style="margin-right:10px;">روحي عدّلي الأسعار دلوقتي</a>
+</div>
+{% endif %}
+{% endblock %}
