@@ -32,7 +32,7 @@
         {% endif %}
         {% if result.new_price_combos %}
         <div class="card" style="background:#FFF3E0; margin-top:12px;">
-            <b>💵 تركيبات جديدة أُضيفت تلقائيًا لجدول أسعار البيع بسعر صفر - جاهزة تكتبي فيها السعر:</b>
+            <b>💵 تركيبات جديدة أُضيفت تلقائيًا لجدول أسعار البيع بسعر صفر - {{ gform('جاهز', 'جاهزة') }} {{ gform('تكتب', 'تكتبي') }} فيها السعر:</b>
             <ul>
                 {% for c in result.new_price_combos %}
                 <li>{{ c.package }} / {{ c.port }} → {{ c.destination }} / {{ c.category }}</li>

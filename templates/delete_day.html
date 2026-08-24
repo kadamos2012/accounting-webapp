@@ -26,7 +26,7 @@
         {% endfor %}
     </table>
     {% if preview.rows %}
-    <form method="post" onsubmit="return confirm('متأكدة إنك عايزة تحذفي كل الـ{{ preview.rows|length }} حجز دول؟ العملية مش قابلة للتراجع.');">
+    <form method="post" onsubmit="return confirm('{{ gform("متأكد", "متأكدة") }} إنك {{ gform("عايز", "عايزة") }} {{ gform("تحذف", "تحذفي") }} كل الـ{{ preview.rows|length }} حجز دول؟ العملية مش قابلة للتراجع.');">
         <input type="hidden" name="action" value="confirm_delete">
         <input type="hidden" name="target_date" value="{{ preview.date }}">
         <button type="submit" class="btn" style="background:#c62828;">

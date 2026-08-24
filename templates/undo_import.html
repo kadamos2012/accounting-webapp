@@ -7,7 +7,7 @@
     <p>آخر استيراد: <b>{{ last[2] }}</b></p>
     <p>التاريخ: {{ last[1] }}</p>
     <p>عدد العملاء المضافين: <b>{{ last[3] }}</b></p>
-    <form method="post" onsubmit="return confirm('متأكدة إنك عايزة تتراجعي عن الاستيراد ده؟');">
+    <form method="post" onsubmit="return confirm('{{ gform("متأكد", "متأكدة") }} إنك {{ gform("عايز", "عايزة") }} {{ gform("تتراجع", "تتراجعي") }} عن الاستيراد ده؟');">
         <button type="submit" class="btn" style="background:#c62828;">تراجع الآن</button>
     </form>
     {% else %}

@@ -53,7 +53,7 @@
             <td>{{ r.supplier }}</td>
             <td>
                 <form method="post" action="{{ url_for('investment_assignment_delete', row_id=r.id) }}"
-                      onsubmit="return confirm('متأكدة؟');" style="display:inline;">
+                      onsubmit="return confirm('{{ gform("متأكد", "متأكدة") }}؟');" style="display:inline;">
                     <button type="submit" class="btn" style="background:#c62828;">حذف</button>
                 </form>
             </td>
