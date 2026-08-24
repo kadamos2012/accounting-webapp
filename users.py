@@ -39,6 +39,42 @@ def change_password(username, new_password):
     conn.close()
 
 
+def get_user_by_id(user_id):
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+    user = cur.fetchone()
+    conn.close()
+    return user
+
+
+def update_user(user_id, display_name, is_admin, gender):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE users SET display_name = %s, is_admin = %s, gender = %s WHERE id = %s
+    """, (display_name, int(is_admin), gender, user_id))
+    conn.commit()
+    conn.close()
+
+
+def admin_reset_password(user_id, new_password):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET password_hash = %s WHERE id = %s",
+                (generate_password_hash(new_password), user_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_user(user_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+    conn.commit()
+    conn.close()
+
+
 def list_users():
     conn = get_connection(dict_cursor=True)
     cur = conn.cursor()

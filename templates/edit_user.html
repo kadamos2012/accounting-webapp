@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}تعديل مستخدم{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>✏ تعديل المستخدم: {{ user.username }}</h2>
+    <p style="color:#555;">اسم المستخدم (للدخول) مايتغيّرش من هنا.</p>
+    <form method="post">
+        <label>الاسم الظاهر:</label>
+        <input type="text" name="display_name" value="{{ user.display_name }}" style="width:100%;">
+
+        <label>الجنس:</label>
+        <select name="gender" style="width:100%;">
+            <option value="female" {{ 'selected' if user.gender == 'female' }}>أنثى</option>
+            <option value="male" {{ 'selected' if user.gender == 'male' }}>ذكر</option>
+        </select>
+
+        <label><input type="checkbox" name="is_admin" {{ 'checked' if user.is_admin }}>
+            مدير (يقدر يشوف سجل النشاط ويضيف/يعدّل مستخدمين)</label>
+
+        <label style="margin-top:16px;">كلمة سر جديدة (سيبيها فاضية لو مش عايزة تغيّريها):</label>
+        <input type="password" name="new_password" style="width:100%;">
+
+        <br><br>
+        <button type="submit" class="btn btn-green">حفظ التعديلات</button>
+    </form>
+</div>
+
+<div class="card">
+    <form method="post" action="{{ url_for('delete_user_page', user_id=user.id) }}"
+          onsubmit="return confirm('{{ gform('متأكد', 'متأكدة') }} إنك {{ gform('عايز', 'عايزة') }} تحذف المستخدم ده نهائيًا؟');">
+        <button type="submit" class="btn" style="background:#c62828;">🗑 حذف هذا المستخدم</button>
+    </form>
+</div>
+{% endblock %}

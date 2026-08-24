@@ -27,7 +27,7 @@
 <div class="card">
     <h3>المستخدمين الحاليين</h3>
     <table>
-        <tr><th>اسم المستخدم</th><th>الاسم الظاهر</th><th>الجنس</th><th>مدير؟</th><th>تاريخ الإنشاء</th></tr>
+        <tr><th>اسم المستخدم</th><th>الاسم الظاهر</th><th>الجنس</th><th>مدير؟</th><th>تاريخ الإنشاء</th><th></th></tr>
         {% for u in all_users %}
         <tr>
             <td>{{ u.username }}</td>
@@ -35,6 +35,7 @@
             <td>{{ 'أنثى' if u.gender == 'female' else 'ذكر' }}</td>
             <td>{{ 'نعم' if u.is_admin else 'لا' }}</td>
             <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+            <td><a href="{{ url_for('edit_user_page', user_id=u.id) }}" class="btn">✏ تعديل</a></td>
         </tr>
         {% endfor %}
     </table>

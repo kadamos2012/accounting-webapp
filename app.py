@@ -1060,6 +1060,46 @@ def users_page():
     return render_template("users.html", all_users=all_users, message=message)
 
 
+@app.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def edit_user_page(user_id):
+    message = None
+    if request.method == "POST":
+        display_name = request.form.get("display_name", "").strip()
+        is_admin = bool(request.form.get("is_admin"))
+        gender = request.form.get("gender", "female")
+        new_password = request.form.get("new_password", "").strip()
+        users_module.update_user(user_id, display_name, is_admin, gender)
+        if new_password:
+            users_module.admin_reset_password(user_id, new_password)
+            log("تعديل مستخدم", f"عدّل بيانات وغيّر كلمة سر المستخدم id={user_id}")
+        else:
+            log("تعديل مستخدم", f"عدّل بيانات المستخدم id={user_id}")
+        flash("تم حفظ التعديلات")
+        return redirect(url_for("users_page"))
+    user = users_module.get_user_by_id(user_id)
+    if not user:
+        flash("المستخدم غير موجود")
+        return redirect(url_for("users_page"))
+    return render_template("edit_user.html", user=user)
+
+
+@app.route("/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def delete_user_page(user_id):
+    user = users_module.get_user_by_id(user_id)
+    if user and user["username"] == session.get("username"):
+        flash("متقدريش تحذفي حسابك الشخصي وانتِ داخلة بيه")
+        return redirect(url_for("users_page"))
+    if user:
+        users_module.delete_user(user_id)
+        log("حذف مستخدم", f"حذف المستخدم: {user['username']}")
+        flash(f"تم حذف المستخدم '{user['username']}'")
+    return redirect(url_for("users_page"))
+
+
 @app.route("/change-password", methods=["GET", "POST"])
 @login_required
 def change_password_page():
