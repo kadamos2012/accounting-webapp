@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}المديونيات{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>💳 المديونيات - لينا وعلينا</h2>
+    <form method="get" style="display:flex; gap:10px; align-items:end;">
+        <div>
+            <label>من تاريخ:</label>
+            <input type="date" name="from" value="{{ date_from if date_from != '2020-01-01' else '' }}">
+        </div>
+        <div>
+            <label>إلى تاريخ:</label>
+            <input type="date" name="to" value="{{ date_to if date_to != '2099-12-31' else '' }}">
+        </div>
+        <button type="submit" class="btn">تحديث</button>
+    </form>
+</div>
+
+<div style="display:flex; gap:20px; margin-top: 10px;">
+    <div class="card" style="flex:1; background:#E8F5E9;">
+        <h3 style="color:#2E7D32;">لينا (مستحق لنا)</h3>
+        <div style="font-size:26px; font-weight:bold; color:#2E7D32;">
+            {{ "{:,.0f}".format(summary.total_owed_to_us) }}
+        </div>
+    </div>
+    <div class="card" style="flex:1; background:#FFEBEE;">
+        <h3 style="color:#c62828;">علينا (مستحق للغير)</h3>
+        <div style="font-size:26px; font-weight:bold; color:#c62828;">
+            {{ "{:,.0f}".format(summary.total_we_owe) }}
+        </div>
+    </div>
+    <div class="card" style="flex:1; background:#E3F2FD;">
+        <h3 style="color:#1565C0;">الصافى</h3>
+        {% set net = summary.total_owed_to_us - summary.total_we_owe %}
+        <div style="font-size:26px; font-weight:bold; color:{{ '#2E7D32' if net >= 0 else '#c62828' }};">
+            {{ "{:,.0f}".format(net) }}
+        </div>
+    </div>
+</div>
+
+<div style="display:flex; gap:20px; margin-top:20px;">
+    <div class="card" style="flex:1;">
+        <h3 style="color:#2E7D32;">تفاصيل - لينا</h3>
+        {% if summary.owed_to_us %}
+        <table>
+            <tr><th>الاسم</th><th>النوع</th><th>المبلغ</th></tr>
+            {% for d in summary.owed_to_us %}
+            <tr><td>{{ d.name }}</td><td>{{ d.type }}</td><td>{{ "{:,.0f}".format(d.amount) }}</td></tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p style="color:#555;">مفيش حد مديون لنا حاليًا.</p>
+        {% endif %}
+    </div>
+    <div class="card" style="flex:1;">
+        <h3 style="color:#c62828;">تفاصيل - علينا</h3>
+        {% if summary.we_owe %}
+        <table>
+            <tr><th>الاسم</th><th>النوع</th><th>المبلغ</th></tr>
+            {% for d in summary.we_owe %}
+            <tr><td>{{ d.name }}</td><td>{{ d.type }}</td><td>{{ "{:,.0f}".format(d.amount) }}</td></tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p style="color:#555;">مفيش مديونيات علينا حاليًا.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

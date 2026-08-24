@@ -106,8 +106,18 @@ def dashboard():
     cur.execute("SELECT COUNT(*) AS c FROM sales WHERE total_sales <= 0")
     zero_price = cur.fetchone()["c"]
     conn.close()
+    debts = reports.get_debts_summary()
     return render_template("dashboard.html", total_clients=total_clients,
-                            last_import=last_import, zero_price=zero_price)
+                            last_import=last_import, zero_price=zero_price, debts=debts)
+
+
+@app.route("/debts")
+@login_required
+def debts_page():
+    date_from = request.args.get("from", "2020-01-01")
+    date_to = request.args.get("to", "2099-12-31")
+    summary = reports.get_debts_summary(date_from, date_to)
+    return render_template("debts.html", summary=summary, date_from=date_from, date_to=date_to)
 
 
 @app.route("/import", methods=["GET", "POST"])

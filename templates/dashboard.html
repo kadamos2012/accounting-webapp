@@ -24,31 +24,33 @@
 </div>
 
 <div class="card">
-    <h3>الأدوات</h3>
+    <h3>💳 المديونيات</h3>
+    <div style="display:flex; gap:20px;">
+        <div class="card" style="flex:1; background:#E8F5E9; text-align:center;">
+            <div style="color:#2E7D32;">لينا (مستحق لنا)</div>
+            <div style="font-size:24px; font-weight:bold; color:#2E7D32;">
+                {{ "{:,.0f}".format(debts.total_owed_to_us) }}
+            </div>
+        </div>
+        <div class="card" style="flex:1; background:#FFEBEE; text-align:center;">
+            <div style="color:#c62828;">علينا (مستحق للغير)</div>
+            <div style="font-size:24px; font-weight:bold; color:#c62828;">
+                {{ "{:,.0f}".format(debts.total_we_owe) }}
+            </div>
+        </div>
+    </div>
+    <br>
+    <a href="{{ url_for('debts_page') }}" class="btn">عرض التفاصيل الكاملة</a>
+</div>
+
+<div class="card">
+    <h3>اختصارات سريعة</h3>
     <div style="display: flex; flex-wrap: wrap; gap: 10px;">
         <a href="{{ url_for('import_page') }}" class="btn">📥 استيراد تقديمات اليوم</a>
         <a href="{{ url_for('treasury_page') }}" class="btn">💰 تسجيل حركة خزنة</a>
-        <a href="{{ url_for('agent_report') }}" class="btn">📊 تقرير حساب الوكلاء</a>
-        <a href="{{ url_for('full_report') }}" class="btn">📈 التقرير الشامل</a>
-        <a href="{{ url_for('sales_by_period_page') }}" class="btn">📈 تقرير مبيعات فترة</a>
-        <a href="{{ url_for('treasury_report_page') }}" class="btn">🏦 تقرير حركة الخزنة</a>
-        <a href="{{ url_for('recalculate_page') }}" class="btn" style="background:#6A1B9A;">🔄 إعادة حساب فترة</a>
-        <a href="{{ url_for('statement_page') }}" class="btn">📄 كشف حساب طرف</a>
         <a href="{{ url_for('client_search_page') }}" class="btn">🔍 بحث وتعديل حجز</a>
-        <a href="{{ url_for('noshow_page') }}" class="btn" style="background:#c62828;">🚫 حالة الغياب</a>
-        <a href="{{ url_for('sell_prices_page') }}" class="btn" style="background:#E65100;">💵 تعديل أسعار البيع</a>
-        <a href="{{ url_for('service_costs_page') }}" class="btn" style="background:#E65100;">📦 تعديل تكلفة الخدمات</a>
-        <a href="{{ url_for('ticket_costs_page') }}" class="btn" style="background:#E65100;">✈ تعديل تكلفة التذاكر</a>
-        <a href="{{ url_for('investment_assignment_page') }}" class="btn" style="background:#E65100;">⚙ تخصيص موردى الاستثمار</a>
-        <a href="{{ url_for('packages_page') }}" class="btn" style="background:#E65100;">🧩 تركيب الباكدجات</a>
-        <a href="{{ url_for('opening_balances_page') }}" class="btn" style="background:#E65100;">⚖ الأرصدة الافتتاحية</a>
-        <a href="{{ url_for('period_bookings_page') }}" class="btn" style="background:#6A1B9A;">📅 فتح حجوزات فترة</a>
-        <a href="{{ url_for('new_route_page') }}" class="btn" style="background:#00695C;">🗺 إضافة خط سير</a>
-        <a href="{{ url_for('charter_page') }}" class="btn" style="background:#00695C;">🛩 حجز شارتر</a>
-        <a href="{{ url_for('price_change_page') }}" class="btn" style="background:#00695C;">📆 سعر جديد من تاريخ</a>
-        <a href="{{ url_for('health_check_page') }}" class="btn" style="background:#455A64;">🩺 فحص الصحة</a>
-        <a href="{{ url_for('undo_import_page') }}" class="btn" style="background:#455A64;">↩ التراجع عن آخر استيراد</a>
-        <a href="{{ url_for('delete_day_page') }}" class="btn" style="background:#c62828;">🗑 حذف تقديمات يوم</a>
+        <a href="{{ url_for('full_report') }}" class="btn">📈 التقرير الشامل</a>
     </div>
+    <p style="color:#888; font-size:13px; margin-top:12px;">باقي الأدوات كلها موجودة فى القائمة الجانبية.</p>
 </div>
 {% endblock %}

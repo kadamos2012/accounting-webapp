@@ -11,17 +11,37 @@
             background: #f4f6f8;
             margin: 0;
             color: #222;
+            display: flex;
         }
-        .navbar {
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
             background: #1F4E78;
             color: white;
-            padding: 14px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            min-height: 100vh;
+            padding: 16px 12px;
+            order: 2; /* يخلّيها فى أقصى يمين الشاشة فى وضع RTL */
         }
-        .navbar a { color: white; text-decoration: none; margin-right: 16px; }
-        .navbar a:hover { text-decoration: underline; }
+        .sidebar h1 { font-size: 18px; text-align: center; margin: 6px 0 16px; }
+        .sidebar .user-box { text-align: center; font-size: 13px; margin-bottom: 16px; padding-bottom: 12px;
+                              border-bottom: 1px solid rgba(255,255,255,0.2); }
+        .sidebar .user-box a { color: #BBDEFB; font-size: 12px; }
+        .sidebar-section { margin-bottom: 6px; }
+        .sidebar-section summary {
+            cursor: pointer; padding: 8px 10px; font-weight: bold; font-size: 13px;
+            border-radius: 6px; list-style: none; opacity: 0.9;
+        }
+        .sidebar-section summary::-webkit-details-marker { display: none; }
+        .sidebar-section[open] summary { background: rgba(255,255,255,0.1); }
+        .sidebar a.nav-link {
+            display: block; color: white; text-decoration: none; padding: 7px 10px 7px 20px;
+            font-size: 13px; border-radius: 6px; opacity: 0.85;
+        }
+        .sidebar a.nav-link:hover { background: rgba(255,255,255,0.15); opacity: 1; }
+        .sidebar a.top-link { display: block; color: white; text-decoration: none; padding: 8px 10px;
+                               font-size: 14px; font-weight: bold; border-radius: 6px; margin-bottom: 4px; }
+        .sidebar a.top-link:hover { background: rgba(255,255,255,0.15); }
+        .main { flex: 1; order: 1; min-width: 0; }
         .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
         .card {
             background: white;
@@ -53,32 +73,86 @@
             padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
         }
         label { display: block; margin: 10px 0 4px; font-weight: bold; }
+        @media (max-width: 900px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; min-height: auto; order: 0; }
+            .main { order: 1; }
+        }
     </style>
 </head>
 <body>
     {% if session.username %}
-    <div class="navbar">
-        <div>
-            <a href="{{ url_for('dashboard') }}">🏠 الرئيسية</a>
-            {% if session.is_admin %}
-            <a href="{{ url_for('activity_log_page') }}">📋 سجل النشاط</a>
-            <a href="{{ url_for('users_page') }}">👥 المستخدمين</a>
-            {% endif %}
-        </div>
-        <div>
-            <span style="margin-left:16px;">{{ session.display_name }}</span>
-            <a href="{{ url_for('change_password_page') }}">🔑 كلمة السر</a>
+    <div class="sidebar">
+        <h1>📊 نظام المحاسبة</h1>
+        <div class="user-box">
+            {{ session.display_name }}
+            <br>
+            <a href="{{ url_for('change_password_page') }}">🔑 كلمة السر</a> ·
             <a href="{{ url_for('logout') }}">خروج</a>
         </div>
+
+        <a class="top-link" href="{{ url_for('dashboard') }}">🏠 الرئيسية</a>
+        <a class="top-link" href="{{ url_for('debts_page') }}">💳 المديونيات (لينا وعلينا)</a>
+
+        <details class="sidebar-section" open>
+            <summary>📥 الشغل اليومي</summary>
+            <a class="nav-link" href="{{ url_for('import_page') }}">استيراد تقديمات اليوم</a>
+            <a class="nav-link" href="{{ url_for('treasury_page') }}">تسجيل حركة خزنة</a>
+            <a class="nav-link" href="{{ url_for('noshow_page') }}">حالة الغياب</a>
+            <a class="nav-link" href="{{ url_for('client_search_page') }}">بحث وتعديل حجز</a>
+            <a class="nav-link" href="{{ url_for('period_bookings_page') }}">فتح حجوزات فترة</a>
+        </details>
+
+        <details class="sidebar-section">
+            <summary>📊 التقارير</summary>
+            <a class="nav-link" href="{{ url_for('agent_report') }}">حساب الوكلاء</a>
+            <a class="nav-link" href="{{ url_for('full_report') }}">التقرير الشامل</a>
+            <a class="nav-link" href="{{ url_for('statement_page') }}">كشف حساب طرف</a>
+            <a class="nav-link" href="{{ url_for('sales_by_period_page') }}">تقرير مبيعات فترة</a>
+            <a class="nav-link" href="{{ url_for('treasury_report_page') }}">تقرير حركة الخزنة</a>
+        </details>
+
+        <details class="sidebar-section">
+            <summary>💵 الأسعار والتكاليف</summary>
+            <a class="nav-link" href="{{ url_for('sell_prices_page') }}">تعديل أسعار البيع</a>
+            <a class="nav-link" href="{{ url_for('populate_sell_prices_page') }}">تجهيز تركيبات ناقصة</a>
+            <a class="nav-link" href="{{ url_for('service_costs_page') }}">تعديل تكلفة الخدمات</a>
+            <a class="nav-link" href="{{ url_for('ticket_costs_page') }}">تعديل تكلفة التذاكر</a>
+            <a class="nav-link" href="{{ url_for('packages_page') }}">تركيب الباكدجات</a>
+            <a class="nav-link" href="{{ url_for('opening_balances_page') }}">الأرصدة الافتتاحية</a>
+            <a class="nav-link" href="{{ url_for('new_route_page') }}">إضافة خط سير</a>
+            <a class="nav-link" href="{{ url_for('price_change_page') }}">سعر جديد من تاريخ</a>
+            <a class="nav-link" href="{{ url_for('investment_assignment_page') }}">تخصيص موردى الاستثمار</a>
+        </details>
+
+        <details class="sidebar-section">
+            <summary>⚙ متقدم</summary>
+            <a class="nav-link" href="{{ url_for('charter_page') }}">حجز شارتر</a>
+            <a class="nav-link" href="{{ url_for('recalculate_page') }}">إعادة حساب فترة</a>
+            <a class="nav-link" href="{{ url_for('health_check_page') }}">فحص الصحة</a>
+            <a class="nav-link" href="{{ url_for('undo_import_page') }}">التراجع عن آخر استيراد</a>
+            <a class="nav-link" href="{{ url_for('delete_day_page') }}">حذف تقديمات يوم</a>
+        </details>
+
+        {% if session.is_admin %}
+        <details class="sidebar-section">
+            <summary>👥 إدارة</summary>
+            <a class="nav-link" href="{{ url_for('activity_log_page') }}">سجل النشاط</a>
+            <a class="nav-link" href="{{ url_for('users_page') }}">المستخدمين</a>
+        </details>
+        {% endif %}
     </div>
     {% endif %}
-    <div class="container">
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+    <div class="main">
+        <div class="container">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </div>
     </div>
 </body>
 </html>
+

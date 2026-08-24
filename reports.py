@@ -440,6 +440,50 @@ def get_all_agent_accounts(date_from="2020-01-01", date_to="2099-12-31"):
     return results
 
 
+def get_debts_summary(date_from="2020-01-01", date_to="2099-12-31"):
+    """ملخص المديونيات: اللي لينا (وكلاء مديونين لنا) واللي علينا (موردين
+    وشركاء إحنا مديونينهم) - بترتيب تنازلي حسب المبلغ فى كل قسم"""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    owed_to_us = []
+    for acc in get_all_agent_accounts(date_from, date_to):
+        if acc["balance"] > 0:
+            owed_to_us.append({"name": acc["agent_name"], "type": "وكيل", "amount": acc["balance"]})
+
+    we_owe = []
+    cur.execute("SELECT name FROM visa_suppliers ORDER BY name")
+    for (name,) in cur.fetchall():
+        acc = get_visa_supplier_account(cur, name, date_from, date_to)
+        if acc["balance"] > 0:
+            we_owe.append({"name": name, "type": "مورد تأشيرات", "amount": acc["balance"]})
+
+    cur.execute("SELECT name FROM investment_suppliers ORDER BY name")
+    for (name,) in cur.fetchall():
+        acc = get_investment_supplier_account(cur, name, date_from, date_to)
+        if acc["balance"] > 0:
+            we_owe.append({"name": name, "type": "مورد استثمار", "amount": acc["balance"]})
+
+    cur.execute("SELECT name FROM airlines ORDER BY name")
+    for (name,) in cur.fetchall():
+        acc = get_airline_account(cur, name, date_from, date_to)
+        if acc["balance"] > 0:
+            we_owe.append({"name": name, "type": "شركة طيران", "amount": acc["balance"]})
+
+    for acc in get_all_partner_accounts(date_from, date_to):
+        if acc["remaining"] > 0:
+            we_owe.append({"name": acc["partner_name"], "type": "شريك (نصيب أرباح)", "amount": acc["remaining"]})
+
+    conn.close()
+    owed_to_us.sort(key=lambda x: -x["amount"])
+    we_owe.sort(key=lambda x: -x["amount"])
+    return {
+        "owed_to_us": owed_to_us, "we_owe": we_owe,
+        "total_owed_to_us": sum(x["amount"] for x in owed_to_us),
+        "total_we_owe": sum(x["amount"] for x in we_owe),
+    }
+
+
 if __name__ == "__main__":
     for r in get_all_agent_accounts():
         if r["total_sales"] or r["total_collected"]:
