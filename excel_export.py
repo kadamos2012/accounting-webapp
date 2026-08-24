@@ -300,3 +300,50 @@ def build_statement_xlsx(entity_name, entity_type, summary, txn_headers, txn_row
     wb.save(buf)
     buf.seek(0)
     return buf
+
+
+PERIOD_BOOKINGS_HEADERS = [
+    "id (لا تغيّريه)", "الاسم", "الرقم القومى", "الوكيل", "الباكدج",
+    "المنفذ", "الوجهة", "تاريخ المغادرة", "شركة الطيران", "مورد الاستثمار",
+    "سعر البيع", "تكلفة تأشيرة", "تكلفة استثمار", "تكلفة تذكرة",
+]
+
+
+def build_period_bookings_xlsx(rows):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "حجوزات الفترة"
+    ws.sheet_view.rightToLeft = True
+    ws.sheet_view.showGridLines = False
+    widths = [8, 24, 16, 16, 20, 16, 16, 14, 16, 16, 12, 12, 12, 12]
+    for col, w in zip("ABCDEFGHIJKLMN", widths):
+        ws.column_dimensions[col].width = w
+
+    for i, h in enumerate(PERIOD_BOOKINGS_HEADERS, start=1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.fill = HEADER_FILL
+        c.font = HEADER_FONT
+        c.alignment = CENTER
+        c.border = BORDER
+
+    r = 2
+    for row in rows:
+        values = [
+            row["id"], row["name"], row["national_id"], row["agent"], row["package_code"],
+            row["port"], row["destination"], row["departure_date"], row["airline"],
+            row["investment_supplier"], row["total_sales"], row["visa_cost"],
+            row["investment_cost"], row["ticket_cost"],
+        ]
+        for i, val in enumerate(values, start=1):
+            cell = ws.cell(row=r, column=i, value=val)
+            cell.border = BORDER
+            cell.alignment = CENTER
+            cell.font = BLACK
+            if isinstance(val, (int, float)):
+                cell.number_format = "#,##0"
+        r += 1
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf

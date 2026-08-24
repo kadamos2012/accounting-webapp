@@ -14,6 +14,25 @@
 
 {% if rows %}
 <div class="card">
+    <h3>📥 تحميل / رفع Excel</h3>
+    <a href="{{ url_for('period_bookings_download', **{'from': date_from, 'to': date_to}) }}" class="btn btn-green">
+        ⬇ تحميل الجدول ده كملف Excel
+    </a>
+    <form method="post" action="{{ url_for('period_bookings_upload') }}" enctype="multipart/form-data" style="margin-top:14px;">
+        <input type="hidden" name="from" value="{{ date_from }}">
+        <input type="hidden" name="to" value="{{ date_to }}">
+        <label>بعد ما تعدّلي فى الملف، ارفعيه هنا:</label>
+        <input type="file" name="bookings_file" accept=".xlsx" required>
+        <br><br>
+        <button type="submit" class="btn">⬆ رفع وتطبيق التعديلات</button>
+    </form>
+    <p style="color:#888; font-size:13px; margin-top:10px;">
+        متلمسيش عمود الـ id فى الملف - ده اللي بيحدد نطبّق التعديل على أي حجز.
+        نفس منطق الحساب هيتطبق: غيّري الوكيل/الباكدج/خط السير من غير ما تلمسي أي سعر = حساب تلقائي،
+        اكتبي رقم فى خانة سعر/تكلفة = يُحترم كما هو.
+    </p>
+</div>
+<div class="card">
     <form method="post">
         <input type="hidden" name="save" value="1">
         <input type="hidden" name="from" value="{{ date_from }}">

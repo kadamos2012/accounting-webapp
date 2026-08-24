@@ -20,6 +20,7 @@ import excel_export
 import users as users_module
 import recalculate_period
 import populate_sell_price_rows
+import period_bookings_helper
 from flask import send_file
 
 app = Flask(__name__)
@@ -764,6 +765,75 @@ def ticket_costs_page():
                             destinations=destinations, airlines=airlines)
 
 
+@app.route("/bookings/period/download")
+@login_required
+def period_bookings_download():
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, name, national_id, agent, package_code, port, destination,
+               departure_date, airline, investment_supplier, total_sales,
+               visa_cost, investment_cost, ticket_cost
+        FROM sales WHERE submission_date BETWEEN %s AND %s ORDER BY id
+    """, (date_from, date_to))
+    rows = cur.fetchall()
+    conn.close()
+    buf = excel_export.build_period_bookings_xlsx(rows)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    return send_file(buf, as_attachment=True, download_name=f"حجوزات_فترة_{timestamp}.xlsx",
+                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.route("/bookings/period/upload", methods=["POST"])
+@login_required
+def period_bookings_upload():
+    date_from = request.form.get("from", "")
+    date_to = request.form.get("to", "")
+    file = request.files.get("bookings_file")
+    if not file or file.filename == "":
+        flash("من فضلك اختاري ملف")
+        return redirect(url_for("period_bookings_page", **{"from": date_from, "to": date_to}))
+
+    from openpyxl import load_workbook
+    wb = load_workbook(file, data_only=True)
+    ws = wb.active
+
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    updated = 0
+    overridden = 0
+    r = 2
+    while ws.cell(row=r, column=1).value is not None:
+        sid = ws.cell(row=r, column=1).value
+        vals = [ws.cell(row=r, column=c).value for c in range(1, 15)]
+        (_id, _name, _nid, agent, package, port, dest, depdate, airline, supplier,
+         sales, visa, investment, ticket) = vals
+
+        depdate_str = depdate.strftime("%Y-%m-%d") if hasattr(depdate, "strftime") else (depdate or "")
+
+        result = period_bookings_helper.save_one_row(
+            cur, conn, sid, agent, package, port, dest, depdate_str,
+            airline, supplier,
+            str(sales) if sales not in (None, "") else "",
+            str(visa) if visa not in (None, "") else "",
+            str(investment) if investment not in (None, "") else "",
+            str(ticket) if ticket not in (None, "") else "",
+        )
+        if result == "recalculated":
+            updated += 1
+        elif result == "overridden":
+            overridden += 1
+        r += 1
+
+    conn.commit()
+    conn.close()
+    log("رفع ملف حجوزات فترة", f"{updated} أعيد حسابهم تلقائيًا, {overridden} بتعديل يدوي مباشر")
+    flash(f"تم رفع الملف وتطبيقه: {updated} أعيد حسابهم تلقائيًا، {overridden} بتعديل يدوي مباشر")
+    return redirect(url_for("period_bookings_page", **{"from": date_from, "to": date_to}))
+
+
 @app.route("/bookings/period", methods=["GET", "POST"])
 @login_required
 def period_bookings_page():
@@ -796,81 +866,15 @@ def period_bookings_page():
                 manual_investment = request.form.get(f"investment_{sid}")
                 manual_ticket = request.form.get(f"ticket_{sid}")
 
-                cur.execute("""
-                    SELECT name, date_of_birth, national_id, passport_number, port, destination,
-                           flight_number, departure_date, submission_date, agent, category,
-                           package_code, total_sales, visa_cost, investment_cost, ticket_cost,
-                           airline, investment_supplier
-                    FROM sales WHERE id = %s
-                """, (sid,))
-                row = cur.fetchone()
-                if not row:
-                    continue
-
-                agent = new_agent if new_agent is not None else row["agent"]
-                package_code = new_package if new_package is not None else row["package_code"]
-                port = new_port if new_port else row["port"]
-                destination = new_dest if new_dest else row["destination"]
-                departure_date = new_depdate if new_depdate else row["departure_date"]
-
-                def parse_or(val, fallback):
-                    try:
-                        return float(val)
-                    except (TypeError, ValueError):
-                        return fallback
-
-                manually_touched = any(v not in (None, "") for v in
-                                        [manual_airline, manual_supplier, manual_sales, manual_visa,
-                                         manual_investment, manual_ticket])
-
-                if manually_touched:
-                    # تعديل يدوي مباشر (شركة الطيران/مورد الاستثمار/السعر/أي تكلفة) -
-                    # يُحترم كما هو بالظبط، من غير إعادة حساب تلقائية تلغيه
-                    total_sales = parse_or(manual_sales, row["total_sales"])
-                    visa_cost = parse_or(manual_visa, row["visa_cost"])
-                    investment_cost = parse_or(manual_investment, row["investment_cost"])
-                    ticket_cost = parse_or(manual_ticket, row["ticket_cost"])
-                    total_cost = visa_cost + investment_cost + ticket_cost
-                    airline = manual_airline if manual_airline else row["airline"]
-                    investment_supplier = manual_supplier if manual_supplier else row["investment_supplier"]
-                    cur.execute("""
-                        UPDATE sales SET agent = %s, package_code = %s, port = %s, destination = %s,
-                            departure_date = %s, airline = %s, investment_supplier = %s,
-                            total_sales = %s, visa_cost = %s, investment_cost = %s,
-                            ticket_cost = %s, service_cost_total = %s, total_cost = %s,
-                            net_profit = %s
-                        WHERE id = %s
-                    """, (agent, package_code, port, destination, departure_date, airline,
-                          investment_supplier, total_sales, visa_cost, investment_cost, ticket_cost,
-                          visa_cost + investment_cost, total_cost,
-                          total_sales - total_cost, sid))
-                    overridden += 1
-                else:
-                    # مفيش تعديل يدوي على أي رقم - نعيد الحساب تلقائيًا لو الوكيل/الباكدج/خط
-                    # السير اتغيّروا (أو حتى لو مفيش تغيير، بيرجّع نفس القيم)
-                    from pricing_engine import calculate_row
-                    import psycopg2.extensions
-                    plain_cur = conn.cursor(cursor_factory=psycopg2.extensions.cursor)
-                    recalculated = calculate_row(
-                        plain_cur, row["name"], row["date_of_birth"], row["national_id"],
-                        row["passport_number"], port, destination,
-                        row["flight_number"], departure_date, row["submission_date"],
-                        agent, row["category"], package_code, row_already_in_db=True
-                    )
-                    cur.execute("""
-                        UPDATE sales SET
-                            agent = %(agent)s, package_code = %(package_code)s,
-                            port = %(port)s, destination = %(destination)s,
-                            departure_date = %(departure_date)s,
-                            service_price = %(service_price)s, ticket_price = %(ticket_price)s,
-                            total_sales = %(total_sales)s, visa_cost = %(visa_cost)s,
-                            investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,
-                            service_cost_total = %(service_cost_total)s, ticket_cost = %(ticket_cost)s,
-                            total_cost = %(total_cost)s, net_profit = %(net_profit)s,
-                            airline = %(airline)s, investment_supplier = %(investment_supplier)s
-                        WHERE id = %(sid)s
-                    """, {**recalculated, "sid": sid})
+                result = period_bookings_helper.save_one_row(
+                    cur, conn, sid, new_agent, new_package, new_port, new_dest, new_depdate,
+                    manual_airline, manual_supplier, manual_sales, manual_visa,
+                    manual_investment, manual_ticket
+                )
+                if result == "recalculated":
                     updated += 1
+                elif result == "overridden":
+                    overridden += 1
             conn.commit()
             log("تعديل حجوزات فترة", f"{updated} أعيد حسابهم تلقائيًا, {overridden} بتعديل يدوي مباشر")
             flash(f"تم الحفظ: {updated} أعيد حسابهم تلقائيًا، {overridden} بتعديل يدوي مباشر على السعر/التكلفة")
