@@ -778,7 +778,7 @@ def period_bookings_page():
             overridden = 0
             row_ids = set()
             for key in request.form:
-                for prefix in ("agent_", "package_", "port_", "dest_", "airline_", "invsupplier_",
+                for prefix in ("agent_", "package_", "port_", "dest_", "depdate_", "airline_", "invsupplier_",
                                 "sales_", "visa_", "investment_", "ticket_"):
                     if key.startswith(prefix):
                         row_ids.add(key[len(prefix):])
@@ -788,6 +788,7 @@ def period_bookings_page():
                 new_package = request.form.get(f"package_{sid}")
                 new_port = request.form.get(f"port_{sid}")
                 new_dest = request.form.get(f"dest_{sid}")
+                new_depdate = request.form.get(f"depdate_{sid}")
                 manual_airline = request.form.get(f"airline_{sid}")
                 manual_supplier = request.form.get(f"invsupplier_{sid}")
                 manual_sales = request.form.get(f"sales_{sid}")
@@ -810,6 +811,7 @@ def period_bookings_page():
                 package_code = new_package if new_package is not None else row["package_code"]
                 port = new_port if new_port else row["port"]
                 destination = new_dest if new_dest else row["destination"]
+                departure_date = new_depdate if new_depdate else row["departure_date"]
 
                 def parse_or(val, fallback):
                     try:
@@ -833,13 +835,13 @@ def period_bookings_page():
                     investment_supplier = manual_supplier if manual_supplier else row["investment_supplier"]
                     cur.execute("""
                         UPDATE sales SET agent = %s, package_code = %s, port = %s, destination = %s,
-                            airline = %s, investment_supplier = %s,
+                            departure_date = %s, airline = %s, investment_supplier = %s,
                             total_sales = %s, visa_cost = %s, investment_cost = %s,
                             ticket_cost = %s, service_cost_total = %s, total_cost = %s,
                             net_profit = %s
                         WHERE id = %s
-                    """, (agent, package_code, port, destination, airline, investment_supplier,
-                          total_sales, visa_cost, investment_cost, ticket_cost,
+                    """, (agent, package_code, port, destination, departure_date, airline,
+                          investment_supplier, total_sales, visa_cost, investment_cost, ticket_cost,
                           visa_cost + investment_cost, total_cost,
                           total_sales - total_cost, sid))
                     overridden += 1
@@ -852,13 +854,14 @@ def period_bookings_page():
                     recalculated = calculate_row(
                         plain_cur, row["name"], row["date_of_birth"], row["national_id"],
                         row["passport_number"], port, destination,
-                        row["flight_number"], row["departure_date"], row["submission_date"],
+                        row["flight_number"], departure_date, row["submission_date"],
                         agent, row["category"], package_code, row_already_in_db=True
                     )
                     cur.execute("""
                         UPDATE sales SET
                             agent = %(agent)s, package_code = %(package_code)s,
                             port = %(port)s, destination = %(destination)s,
+                            departure_date = %(departure_date)s,
                             service_price = %(service_price)s, ticket_price = %(ticket_price)s,
                             total_sales = %(total_sales)s, visa_cost = %(visa_cost)s,
                             investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,

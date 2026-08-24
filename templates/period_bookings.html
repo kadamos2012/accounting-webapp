@@ -25,7 +25,8 @@
         <table>
             <tr>
                 <th>الاسم</th><th>الرقم القومى</th><th>الوكيل</th><th>الباكدج</th>
-                <th>المنفذ</th><th>الوجهة</th><th>شركة الطيران</th><th>مورد الاستثمار</th>
+                <th>المنفذ</th><th>الوجهة</th><th>تاريخ المغادرة</th>
+                <th>شركة الطيران</th><th>مورد الاستثمار</th>
                 <th>سعر البيع</th><th>تكلفة تأشيرة</th>
                 <th>تكلفة استثمار</th><th>تكلفة تذكرة</th>
             </tr>
@@ -52,6 +53,9 @@
                 </td>
                 <td>
                     <input list="destList" name="dest_{{ r.id }}" value="{{ r.destination }}" style="width:110px;">
+                </td>
+                <td>
+                    <input type="date" name="depdate_{{ r.id }}" value="{{ r.departure_date }}" style="width:135px;">
                 </td>
                 <td>
                     <input list="airlineList" name="airline_{{ r.id }}" placeholder="{{ r.airline or '' }}" style="width:110px;">
