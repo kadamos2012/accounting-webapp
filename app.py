@@ -956,8 +956,6 @@ def sales_by_period_page():
                             date_from=date_from, date_to=date_to)
 
 
-@app.route("/reports/treasury")
-@login_required
 def _compute_treasury_report(date_from, date_to):
     conn = get_connection(dict_cursor=True)
     cur = conn.cursor()
@@ -979,6 +977,8 @@ def _compute_treasury_report(date_from, date_to):
     return processed, balances
 
 
+@app.route("/reports/treasury")
+@login_required
 def treasury_report_page():
     date_from = request.args.get("from", "2020-01-01")
     date_to = request.args.get("to", "2099-12-31")
