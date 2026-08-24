@@ -13,10 +13,27 @@
 </div>
 
 <div class="card">
+    <div style="display:flex; gap:20px;">
+        <div class="card" style="flex:1; background:#E8F5E9; text-align:center;">
+            <div>💵 رصيد النقدي</div>
+            <div style="font-size:24px; font-weight:bold; color:#2E7D32;">{{ "{:,.0f}".format(balances['نقدي']) }}</div>
+        </div>
+        <div class="card" style="flex:1; background:#E3F2FD; text-align:center;">
+            <div>🏦 رصيد البنك</div>
+            <div style="font-size:24px; font-weight:bold; color:#1565C0;">{{ "{:,.0f}".format(balances['بنك']) }}</div>
+        </div>
+        <div class="card" style="flex:1; background:#F3E5F5; text-align:center;">
+            <div>الإجمالى</div>
+            <div style="font-size:24px; font-weight:bold; color:#6A1B9A;">{{ "{:,.0f}".format(balances['الإجمالى']) }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
     <table>
         <tr>
-            <th>التاريخ</th><th>البيان</th><th>نوع الحركة</th><th>الطرف</th>
-            <th>وارد</th><th>منصرف</th><th>يؤثر على الخزنة؟</th><th>الرصيد الجاري</th>
+            <th>التاريخ</th><th>البيان</th><th>نوع الحركة</th><th>الطرف</th><th>الحساب</th>
+            <th>وارد</th><th>منصرف</th><th>يؤثر على الخزنة؟</th><th>الرصيد الجاري (لنفس الحساب)</th>
         </tr>
         {% for m in movements %}
         <tr style="{{ 'background:#fafafa; color:#999;' if not m.affects_cash }}">
@@ -24,6 +41,7 @@
             <td style="text-align:right;">{{ m.description }}</td>
             <td>{{ m.movement_type }}</td>
             <td>{{ m.party_name or '-' }}</td>
+            <td>{{ '💵 نقدي' if (m.account_type or 'نقدي') == 'نقدي' else '🏦 بنك' }}</td>
             <td>{{ "{:,.0f}".format(m.incoming) if m.incoming else '-' }}</td>
             <td>{{ "{:,.0f}".format(m.outgoing) if m.outgoing else '-' }}</td>
             <td>{{ 'نعم' if m.affects_cash else 'لا (مباشر)' }}</td>

@@ -162,6 +162,7 @@ CREATE TABLE treasury (
     movement_type TEXT NOT NULL,
     party_name TEXT,
     payment_method TEXT,
+    account_type TEXT DEFAULT 'نقدي',
     related_agent TEXT,
     related_partner TEXT,
     incoming REAL DEFAULT 0,

@@ -1,28 +1,47 @@
 {% extends "base.html" %}
 {% block title %}تسجيل حركة خزنة{% endblock %}
 {% block content %}
-<div class="card">
-    <h2>💰 تسجيل حركة خزنة</h2>
-    <form method="post" id="treasuryForm">
-        <label>نوع الحركة:</label>
-        <select name="movement_type" id="movementType" style="width:100%;" onchange="onTypeChange()">
-            {% for mt in movement_types %}
-            <option value="{{ mt }}">{{ mt }}</option>
-            {% endfor %}
-        </select>
+<style>
+    .type-btn {
+        display: inline-block; padding: 10px 16px; margin: 4px; border-radius: 8px;
+        border: 2px solid #ddd; background: white; cursor: pointer; font-size: 13px;
+        text-align: center; user-select: none;
+    }
+    .type-btn.selected { border-color: #1F4E78; background: #E3F2FD; font-weight: bold; }
+    .acct-btn {
+        display: inline-block; padding: 12px 30px; margin: 4px; border-radius: 8px;
+        border: 2px solid #ddd; background: white; cursor: pointer; font-size: 15px; font-weight: bold;
+    }
+    .acct-btn.selected.cash { border-color: #2E7D32; background: #E8F5E9; }
+    .acct-btn.selected.bank { border-color: #1565C0; background: #E3F2FD; }
+</style>
 
-        <label>اسم الطرف:</label>
-        <input list="partyList" name="party" id="partyInput" style="width:100%;">
+<div class="card">
+    <h2>💰 تسجيل حركة خزنة سريع</h2>
+    <form method="post" id="treasuryForm">
+        <label>1) نوع الحركة:</label>
+        <div id="typeButtons"></div>
+        <input type="hidden" name="movement_type" id="movementType">
+
+        <label style="margin-top:16px;">2) الحساب:</label>
+        <div>
+            <span class="acct-btn cash selected" onclick="selectAccount('نقدي')" id="btn-نقدي">💵 نقدي</span>
+            <span class="acct-btn bank" onclick="selectAccount('بنك')" id="btn-بنك">🏦 بنك</span>
+        </div>
+        <input type="hidden" name="account_type" id="accountType" value="نقدي">
+
+        <label style="margin-top:16px;">3) اسم الطرف:</label>
+        <input list="partyList" name="party" id="partyInput" style="width:100%;" autocomplete="off">
         <datalist id="partyList"></datalist>
 
-        <label>البيان:</label>
+        <label>4) المبلغ:</label>
+        <input type="number" step="0.01" name="amount" id="amountInput" required style="width:100%; font-size:20px; padding:12px;">
+
+        <label>البيان (اختياري):</label>
         <input type="text" name="description" style="width:100%;">
 
         <label>التاريخ (فارغ = النهاردة):</label>
         <input type="date" name="date">
-
-        <label>المبلغ:</label>
-        <input type="number" step="0.01" name="amount" required style="width:100%;">
 
         <div id="directPaymentBox" style="display:none; margin-top:10px;">
             <label><input type="checkbox" name="direct" id="directCheck" onchange="toggleRelated()"> سداد مباشر (بين العميل والمورد)</label>
@@ -30,7 +49,6 @@
         <div id="partnerBox" style="display:none; margin-top:10px;">
             <label><input type="checkbox" name="partner_designate" id="partnerCheck" onchange="toggleRelated()"> تخصيص هذا التحصيل لشريك معيّن</label>
         </div>
-
         <div id="relatedBox" style="display:none;">
             <label>الوكيل / الشريك المرتبط:</label>
             <input list="relatedList" name="related_party" style="width:100%;">
@@ -38,13 +56,14 @@
         </div>
 
         <br>
-        <button type="submit" class="btn btn-green">حفظ</button>
+        <button type="submit" class="btn btn-green" style="font-size:16px; padding:14px 30px;">💾 حفظ وتسجيل التالى</button>
     </form>
 </div>
 
 {% if saved %}
 <div class="card" style="background:#E8F5E9;">
     ✓ تم حفظ: {{ saved.movement_type }} - {{ saved.party }} - {{ "{:,.0f}".format(saved.amount) }}
+    ({{ '💵 نقدي' if saved.account_type == 'نقدي' else '🏦 بنك' }})
 </div>
 {% endif %}
 
@@ -56,6 +75,38 @@ const investmentSuppliers = {{ investment_suppliers|tojson }};
 const partners = {{ partners|tojson }};
 const allParties = [...agents, ...airlines, ...visaSuppliers, ...investmentSuppliers, ...partners];
 
+const movementTypes = {{ movement_types|tojson }};
+const typeIcons = {
+    'تحصيل من عميل': '💰', 'سداد لمورد - تأشيرات': '🛂', 'سداد لمورد - تذاكر طيران': '✈️',
+    'سداد لمورد - استثمار': '📈', 'مصروفات عمومية': '🧾', 'توزيع أرباح على شريك': '🤝',
+    'إيداع/تحويل فى الخزنة': '➕', 'أخرى': '⋯'
+};
+
+const typeContainer = document.getElementById('typeButtons');
+movementTypes.forEach((t, i) => {
+    const btn = document.createElement('span');
+    btn.className = 'type-btn' + (i === 0 ? ' selected' : '');
+    btn.textContent = (typeIcons[t] || '') + ' ' + t;
+    btn.dataset.type = t;
+    btn.onclick = () => selectType(t);
+    typeContainer.appendChild(btn);
+});
+selectType(movementTypes[0]);
+
+function selectType(type) {
+    document.getElementById('movementType').value = type;
+    document.querySelectorAll('.type-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.type === type);
+    });
+    onTypeChange(type);
+}
+
+function selectAccount(acct) {
+    document.getElementById('accountType').value = acct;
+    document.getElementById('btn-نقدي').classList.toggle('selected', acct === 'نقدي');
+    document.getElementById('btn-بنك').classList.toggle('selected', acct === 'بنك');
+}
+
 function fillDatalist(id, values) {
     const dl = document.getElementById(id);
     dl.innerHTML = '';
@@ -66,8 +117,7 @@ function fillDatalist(id, values) {
     });
 }
 
-function onTypeChange() {
-    const type = document.getElementById('movementType').value;
+function onTypeChange(type) {
     document.getElementById('directPaymentBox').style.display = 'none';
     document.getElementById('partnerBox').style.display = 'none';
     document.getElementById('relatedBox').style.display = 'none';
@@ -92,6 +142,7 @@ function onTypeChange() {
     }
     fillDatalist('partyList', partyValues);
     fillDatalist('relatedList', [...agents, ...partners]);
+    document.getElementById('amountInput').focus();
 }
 
 function toggleRelated() {
@@ -99,6 +150,6 @@ function toggleRelated() {
     document.getElementById('relatedBox').style.display = show ? 'block' : 'none';
 }
 
-onTypeChange();
+document.getElementById('amountInput').focus();
 </script>
 {% endblock %}

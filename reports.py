@@ -440,6 +440,25 @@ def get_all_agent_accounts(date_from="2020-01-01", date_to="2099-12-31"):
     return results
 
 
+def get_account_balances(cur, date_from="2020-01-01", date_to="2099-12-31"):
+    """رصيد النقدي ورصيد البنك منفصلين عن بعض - نفس استثناء 'السداد المباشر'
+    من رصيد الخزنة الفعلى بيتطبق على الاتنين"""
+    cur.execute("""
+        SELECT COALESCE(account_type, 'نقدي') AS acct,
+               COALESCE(SUM(incoming), 0) - COALESCE(SUM(outgoing), 0) AS net
+        FROM treasury
+        WHERE transaction_date BETWEEN %s AND %s
+              AND (payment_method IS NULL OR payment_method != 'مباشر (بين العميل والمورد)')
+        GROUP BY COALESCE(account_type, 'نقدي')
+    """, (date_from, date_to))
+    balances = {"نقدي": 0.0, "بنك": 0.0}
+    for row in cur.fetchall():
+        acct, net = (row["acct"], row["net"]) if isinstance(row, dict) else (row[0], row[1])
+        balances[acct] = net
+    balances["الإجمالى"] = balances.get("نقدي", 0) + balances.get("بنك", 0)
+    return balances
+
+
 def get_debts_summary(date_from="2020-01-01", date_to="2099-12-31"):
     """ملخص المديونيات: اللي لينا (وكلاء مديونين لنا) واللي علينا (موردين
     وشركاء إحنا مديونينهم) - بترتيب تنازلي حسب المبلغ فى كل قسم"""

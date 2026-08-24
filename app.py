@@ -224,6 +224,7 @@ def treasury_page():
         party = request.form.get("party", "").strip()
         desc = request.form.get("description", "").strip()
         tdate = request.form.get("date", "").strip() or date_today()
+        account_type = request.form.get("account_type", "نقدي")
         try:
             amount = float(request.form.get("amount", 0))
         except ValueError:
@@ -248,14 +249,16 @@ def treasury_page():
             cur = conn.cursor()
             cur.execute("""
                 INSERT INTO treasury(transaction_date, description, movement_type, party_name,
-                                      payment_method, related_agent, related_partner, incoming, outgoing)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (tdate, desc, movement_type, party, payment_method, related_agent,
+                                      payment_method, account_type, related_agent, related_partner,
+                                      incoming, outgoing)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (tdate, desc, movement_type, party, payment_method, account_type, related_agent,
                   related_partner, incoming, outgoing))
             conn.commit()
             conn.close()
-            saved = {"movement_type": movement_type, "party": party, "amount": amount}
-            log("حركة خزنة", f"{movement_type} - {party} - {amount:,.0f}")
+            saved = {"movement_type": movement_type, "party": party, "amount": amount,
+                      "account_type": account_type}
+            log("حركة خزنة", f"{movement_type} - {party} - {amount:,.0f} ({account_type})")
         else:
             flash("المبلغ لازم يكون أكبر من صفر")
 
@@ -960,19 +963,22 @@ def treasury_report_page():
     date_to = request.args.get("to", "2099-12-31")
     conn = get_connection(dict_cursor=True)
     cur = conn.cursor()
+    balances = reports.get_account_balances(cur, date_from, date_to)
     cur.execute("""
         SELECT * FROM treasury WHERE transaction_date BETWEEN %s AND %s ORDER BY transaction_date, id
     """, (date_from, date_to))
     movements = cur.fetchall()
-    running_balance = 0
+    running_by_account = {"نقدي": 0, "بنك": 0}
     processed = []
     for m in movements:
         is_direct = m["payment_method"] == "مباشر (بين العميل والمورد)"
+        acct = m.get("account_type") or "نقدي"
         if not is_direct:
-            running_balance += (m["incoming"] or 0) - (m["outgoing"] or 0)
-        processed.append({**m, "affects_cash": not is_direct, "running_balance": running_balance})
+            running_by_account[acct] = running_by_account.get(acct, 0) + (m["incoming"] or 0) - (m["outgoing"] or 0)
+        processed.append({**m, "affects_cash": not is_direct,
+                            "running_balance": running_by_account.get(acct, 0)})
     conn.close()
-    return render_template("treasury_report.html", movements=processed,
+    return render_template("treasury_report.html", movements=processed, balances=balances,
                             date_from=date_from, date_to=date_to)
 
 
