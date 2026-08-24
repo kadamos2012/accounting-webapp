@@ -24,7 +24,7 @@
         <table>
             <tr>
                 <th>الاسم</th><th>الرقم القومى</th><th>الوكيل</th><th>الباكدج</th>
-                <th>خط السير</th><th>سعر البيع</th><th>تكلفة تأشيرة</th>
+                <th>المنفذ</th><th>الوجهة</th><th>سعر البيع</th><th>تكلفة تأشيرة</th>
                 <th>تكلفة استثمار</th><th>تكلفة تذكرة</th>
             </tr>
             {% for r in rows %}
@@ -45,7 +45,12 @@
                         {% endfor %}
                     </select>
                 </td>
-                <td>{{ r.port }} → {{ r.destination }}</td>
+                <td>
+                    <input list="portList" name="port_{{ r.id }}" value="{{ r.port }}" style="width:110px;">
+                </td>
+                <td>
+                    <input list="destList" name="dest_{{ r.id }}" value="{{ r.destination }}" style="width:110px;">
+                </td>
                 <td><input type="number" step="0.01" name="sales_{{ r.id }}" placeholder="{{ '%.0f'|format(r.total_sales) }}" style="width:100px;"></td>
                 <td><input type="number" step="0.01" name="visa_{{ r.id }}" placeholder="{{ '%.0f'|format(r.visa_cost) }}" style="width:95px;"></td>
                 <td><input type="number" step="0.01" name="investment_{{ r.id }}" placeholder="{{ '%.0f'|format(r.investment_cost) }}" style="width:95px;"></td>
@@ -53,6 +58,8 @@
             </tr>
             {% endfor %}
         </table>
+        <datalist id="portList">{% for p in ports %}<option value="{{ p }}">{% endfor %}</datalist>
+        <datalist id="destList">{% for d in destinations %}<option value="{{ d }}">{% endfor %}</datalist>
         </div>
         <p style="color:#888; font-size:13px;">الأرقام الرمادية الظاهرة فى الخانات هي القيم الحالية - سيبي الخانة فاضية لو مش عايزة تغيّريها.</p>
         <br>

@@ -778,13 +778,15 @@ def period_bookings_page():
             overridden = 0
             row_ids = set()
             for key in request.form:
-                for prefix in ("agent_", "package_", "sales_", "visa_", "investment_", "ticket_"):
+                for prefix in ("agent_", "package_", "port_", "dest_", "sales_", "visa_", "investment_", "ticket_"):
                     if key.startswith(prefix):
                         row_ids.add(key[len(prefix):])
 
             for sid in row_ids:
                 new_agent = request.form.get(f"agent_{sid}")
                 new_package = request.form.get(f"package_{sid}")
+                new_port = request.form.get(f"port_{sid}")
+                new_dest = request.form.get(f"dest_{sid}")
                 manual_sales = request.form.get(f"sales_{sid}")
                 manual_visa = request.form.get(f"visa_{sid}")
                 manual_investment = request.form.get(f"investment_{sid}")
@@ -802,6 +804,8 @@ def period_bookings_page():
 
                 agent = new_agent if new_agent is not None else row["agent"]
                 package_code = new_package if new_package is not None else row["package_code"]
+                port = new_port if new_port else row["port"]
+                destination = new_dest if new_dest else row["destination"]
 
                 def parse_or(val, fallback):
                     try:
@@ -821,29 +825,31 @@ def period_bookings_page():
                     ticket_cost = parse_or(manual_ticket, row["ticket_cost"])
                     total_cost = visa_cost + investment_cost + ticket_cost
                     cur.execute("""
-                        UPDATE sales SET agent = %s, package_code = %s,
+                        UPDATE sales SET agent = %s, package_code = %s, port = %s, destination = %s,
                             total_sales = %s, visa_cost = %s, investment_cost = %s,
                             ticket_cost = %s, service_cost_total = %s, total_cost = %s,
                             net_profit = %s
                         WHERE id = %s
-                    """, (agent, package_code, total_sales, visa_cost, investment_cost, ticket_cost,
-                          visa_cost + investment_cost, total_cost, total_sales - total_cost, sid))
+                    """, (agent, package_code, port, destination, total_sales, visa_cost, investment_cost,
+                          ticket_cost, visa_cost + investment_cost, total_cost,
+                          total_sales - total_cost, sid))
                     overridden += 1
                 else:
-                    # مفيش تعديل يدوي على أي رقم - نعيد الحساب تلقائيًا لو الوكيل
-                    # أو الباكدج اتغيّروا (أو حتى لو مفيش تغيير، بيرجّع نفس القيم)
+                    # مفيش تعديل يدوي على أي رقم - نعيد الحساب تلقائيًا لو الوكيل/الباكدج/خط
+                    # السير اتغيّروا (أو حتى لو مفيش تغيير، بيرجّع نفس القيم)
                     from pricing_engine import calculate_row
                     import psycopg2.extensions
                     plain_cur = conn.cursor(cursor_factory=psycopg2.extensions.cursor)
                     recalculated = calculate_row(
                         plain_cur, row["name"], row["date_of_birth"], row["national_id"],
-                        row["passport_number"], row["port"], row["destination"],
+                        row["passport_number"], port, destination,
                         row["flight_number"], row["departure_date"], row["submission_date"],
                         agent, row["category"], package_code, row_already_in_db=True
                     )
                     cur.execute("""
                         UPDATE sales SET
                             agent = %(agent)s, package_code = %(package_code)s,
+                            port = %(port)s, destination = %(destination)s,
                             service_price = %(service_price)s, ticket_price = %(ticket_price)s,
                             total_sales = %(total_sales)s, visa_cost = %(visa_cost)s,
                             investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,
@@ -869,12 +875,16 @@ def period_bookings_page():
         _cur = _conn.cursor()
         agents = get_names("agents", _cur)
         packages = get_package_codes(_cur)
+        ports = get_known_ports(_cur)
+        destinations = get_known_destinations(_cur)
         _conn.close()
     else:
         agents = get_names("agents")
         packages = get_package_codes()
+        ports = get_known_ports()
+        destinations = get_known_destinations()
     return render_template("period_bookings.html", rows=rows, date_from=date_from, date_to=date_to,
-                            agents=agents, packages=packages)
+                            agents=agents, packages=packages, ports=ports, destinations=destinations)
 
 
 def get_package_codes(cur=None):
