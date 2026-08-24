@@ -113,7 +113,7 @@ def unmark_no_show(national_id, departure_date, delete_linked=True):
             visa_cost = %(visa_cost)s, investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,
             service_cost_total = %(service_cost_total)s, ticket_cost = %(ticket_cost)s,
             total_cost = %(total_cost)s, net_profit = %(net_profit)s,
-            investment_supplier = %(investment_supplier)s
+            airline = %(airline)s, investment_supplier = %(investment_supplier)s
         WHERE id = %(sale_id)s
     """, {**recalculated, "sale_id": sale_id})
 

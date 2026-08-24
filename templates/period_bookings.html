@@ -18,13 +18,15 @@
         <input type="hidden" name="save" value="1">
         <input type="hidden" name="from" value="{{ date_from }}">
         <input type="hidden" name="to" value="{{ date_to }}">
-        <p>{{ rows|length }} حجز - عدّلي الوكيل/الباكدج (بيتحسب السعر والتكلفة تلقائيًا)،
-           أو اكتبي سعر/تكلفة يدويًا لو محتاجة قيمة خاصة لحجز معيّن (بيتم احترامها كما هي من غير إعادة حساب).</p>
+        <p>{{ rows|length }} حجز - عدّلي الوكيل/الباكدج/خط السير (بيتحسب السعر والتكلفة تلقائيًا)،
+           أو اكتبي شركة طيران/مورد استثمار/سعر/تكلفة يدويًا لو محتاجة قيمة خاصة لحجز معيّن
+           (بيتم احترامها كما هي من غير إعادة حساب).</p>
         <div style="overflow-x:auto;">
         <table>
             <tr>
                 <th>الاسم</th><th>الرقم القومى</th><th>الوكيل</th><th>الباكدج</th>
-                <th>المنفذ</th><th>الوجهة</th><th>سعر البيع</th><th>تكلفة تأشيرة</th>
+                <th>المنفذ</th><th>الوجهة</th><th>شركة الطيران</th><th>مورد الاستثمار</th>
+                <th>سعر البيع</th><th>تكلفة تأشيرة</th>
                 <th>تكلفة استثمار</th><th>تكلفة تذكرة</th>
             </tr>
             {% for r in rows %}
@@ -51,6 +53,12 @@
                 <td>
                     <input list="destList" name="dest_{{ r.id }}" value="{{ r.destination }}" style="width:110px;">
                 </td>
+                <td>
+                    <input list="airlineList" name="airline_{{ r.id }}" placeholder="{{ r.airline or '' }}" style="width:110px;">
+                </td>
+                <td>
+                    <input list="supplierList" name="invsupplier_{{ r.id }}" placeholder="{{ r.investment_supplier or '' }}" style="width:120px;">
+                </td>
                 <td><input type="number" step="0.01" name="sales_{{ r.id }}" placeholder="{{ '%.0f'|format(r.total_sales) }}" style="width:100px;"></td>
                 <td><input type="number" step="0.01" name="visa_{{ r.id }}" placeholder="{{ '%.0f'|format(r.visa_cost) }}" style="width:95px;"></td>
                 <td><input type="number" step="0.01" name="investment_{{ r.id }}" placeholder="{{ '%.0f'|format(r.investment_cost) }}" style="width:95px;"></td>
@@ -60,8 +68,11 @@
         </table>
         <datalist id="portList">{% for p in ports %}<option value="{{ p }}">{% endfor %}</datalist>
         <datalist id="destList">{% for d in destinations %}<option value="{{ d }}">{% endfor %}</datalist>
+        <datalist id="airlineList">{% for a in airlines %}<option value="{{ a }}">{% endfor %}</datalist>
+        <datalist id="supplierList">{% for s in investment_suppliers %}<option value="{{ s }}">{% endfor %}</datalist>
         </div>
-        <p style="color:#888; font-size:13px;">الأرقام الرمادية الظاهرة فى الخانات هي القيم الحالية - سيبي الخانة فاضية لو مش عايزة تغيّريها.</p>
+        <p style="color:#888; font-size:13px;">القيم الرمادية الظاهرة فى الخانات هي الحالية - سيبي الخانة فاضية لو مش عايزة تغيّريها.
+            تعديل شركة الطيران أو مورد الاستثمار بيتعامل كتعديل يدوي مباشر برضو (زي السعر والتكلفة).</p>
         <br>
         <button type="submit" class="btn btn-green">حفظ التعديلات</button>
     </form>

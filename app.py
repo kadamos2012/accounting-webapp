@@ -778,7 +778,8 @@ def period_bookings_page():
             overridden = 0
             row_ids = set()
             for key in request.form:
-                for prefix in ("agent_", "package_", "port_", "dest_", "sales_", "visa_", "investment_", "ticket_"):
+                for prefix in ("agent_", "package_", "port_", "dest_", "airline_", "invsupplier_",
+                                "sales_", "visa_", "investment_", "ticket_"):
                     if key.startswith(prefix):
                         row_ids.add(key[len(prefix):])
 
@@ -787,6 +788,8 @@ def period_bookings_page():
                 new_package = request.form.get(f"package_{sid}")
                 new_port = request.form.get(f"port_{sid}")
                 new_dest = request.form.get(f"dest_{sid}")
+                manual_airline = request.form.get(f"airline_{sid}")
+                manual_supplier = request.form.get(f"invsupplier_{sid}")
                 manual_sales = request.form.get(f"sales_{sid}")
                 manual_visa = request.form.get(f"visa_{sid}")
                 manual_investment = request.form.get(f"investment_{sid}")
@@ -795,7 +798,8 @@ def period_bookings_page():
                 cur.execute("""
                     SELECT name, date_of_birth, national_id, passport_number, port, destination,
                            flight_number, departure_date, submission_date, agent, category,
-                           package_code, total_sales, visa_cost, investment_cost, ticket_cost
+                           package_code, total_sales, visa_cost, investment_cost, ticket_cost,
+                           airline, investment_supplier
                     FROM sales WHERE id = %s
                 """, (sid,))
                 row = cur.fetchone()
@@ -814,24 +818,29 @@ def period_bookings_page():
                         return fallback
 
                 manually_touched = any(v not in (None, "") for v in
-                                        [manual_sales, manual_visa, manual_investment, manual_ticket])
+                                        [manual_airline, manual_supplier, manual_sales, manual_visa,
+                                         manual_investment, manual_ticket])
 
                 if manually_touched:
-                    # تعديل يدوي مباشر على أي رقم (سعر بيع أو أي تكلفة) - يُحترم
-                    # كما هو بالظبط، من غير إعادة حساب تلقائية تلغيه
+                    # تعديل يدوي مباشر (شركة الطيران/مورد الاستثمار/السعر/أي تكلفة) -
+                    # يُحترم كما هو بالظبط، من غير إعادة حساب تلقائية تلغيه
                     total_sales = parse_or(manual_sales, row["total_sales"])
                     visa_cost = parse_or(manual_visa, row["visa_cost"])
                     investment_cost = parse_or(manual_investment, row["investment_cost"])
                     ticket_cost = parse_or(manual_ticket, row["ticket_cost"])
                     total_cost = visa_cost + investment_cost + ticket_cost
+                    airline = manual_airline if manual_airline else row["airline"]
+                    investment_supplier = manual_supplier if manual_supplier else row["investment_supplier"]
                     cur.execute("""
                         UPDATE sales SET agent = %s, package_code = %s, port = %s, destination = %s,
+                            airline = %s, investment_supplier = %s,
                             total_sales = %s, visa_cost = %s, investment_cost = %s,
                             ticket_cost = %s, service_cost_total = %s, total_cost = %s,
                             net_profit = %s
                         WHERE id = %s
-                    """, (agent, package_code, port, destination, total_sales, visa_cost, investment_cost,
-                          ticket_cost, visa_cost + investment_cost, total_cost,
+                    """, (agent, package_code, port, destination, airline, investment_supplier,
+                          total_sales, visa_cost, investment_cost, ticket_cost,
+                          visa_cost + investment_cost, total_cost,
                           total_sales - total_cost, sid))
                     overridden += 1
                 else:
@@ -855,7 +864,7 @@ def period_bookings_page():
                             investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,
                             service_cost_total = %(service_cost_total)s, ticket_cost = %(ticket_cost)s,
                             total_cost = %(total_cost)s, net_profit = %(net_profit)s,
-                            investment_supplier = %(investment_supplier)s
+                            airline = %(airline)s, investment_supplier = %(investment_supplier)s
                         WHERE id = %(sid)s
                     """, {**recalculated, "sid": sid})
                     updated += 1
@@ -866,7 +875,7 @@ def period_bookings_page():
         cur.execute("""
             SELECT id, name, national_id, agent, package_code, port, destination,
                    flight_number, total_sales, visa_cost, investment_cost, ticket_cost,
-                   total_cost, airline, departure_date
+                   total_cost, airline, investment_supplier, departure_date
             FROM sales WHERE submission_date BETWEEN %s AND %s ORDER BY id
         """, (date_from, date_to))
         rows = cur.fetchall()
@@ -877,14 +886,19 @@ def period_bookings_page():
         packages = get_package_codes(_cur)
         ports = get_known_ports(_cur)
         destinations = get_known_destinations(_cur)
+        airlines = get_names("airlines", _cur)
+        investment_suppliers = get_names("investment_suppliers", _cur)
         _conn.close()
     else:
         agents = get_names("agents")
         packages = get_package_codes()
         ports = get_known_ports()
         destinations = get_known_destinations()
+        airlines = get_names("airlines")
+        investment_suppliers = get_names("investment_suppliers")
     return render_template("period_bookings.html", rows=rows, date_from=date_from, date_to=date_to,
-                            agents=agents, packages=packages, ports=ports, destinations=destinations)
+                            agents=agents, packages=packages, ports=ports, destinations=destinations,
+                            airlines=airlines, investment_suppliers=investment_suppliers)
 
 
 def get_package_codes(cur=None):
@@ -1277,7 +1291,7 @@ def client_edit_page(client_id):
                 visa_cost = %(visa_cost)s, investment_cost = %(investment_cost)s, approval_cost = %(approval_cost)s,
                 service_cost_total = %(service_cost_total)s, ticket_cost = %(ticket_cost)s,
                 total_cost = %(total_cost)s, net_profit = %(net_profit)s,
-                investment_supplier = %(investment_supplier)s
+                airline = %(airline)s, investment_supplier = %(investment_supplier)s
             WHERE id = %(client_id)s
         """, {**recalculated, "client_id": client_id})
         conn.commit()
