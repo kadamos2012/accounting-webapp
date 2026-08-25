@@ -1093,6 +1093,64 @@ def treasury_report_page():
                             date_from=date_from, date_to=date_to)
 
 
+@app.route("/treasury/<int:txn_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_treasury_page(txn_id):
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    if request.method == "POST":
+        movement_type = request.form.get("movement_type")
+        party = request.form.get("party", "").strip()
+        desc = request.form.get("description", "").strip()
+        tdate = request.form.get("date", "").strip()
+        account_type = request.form.get("account_type", "نقدي")
+        try:
+            amount = float(request.form.get("amount", 0))
+        except ValueError:
+            amount = 0
+
+        if amount <= 0:
+            flash("المبلغ لازم يكون أكبر من صفر")
+        else:
+            incoming = amount if movement_type in ("تحصيل من عميل", "إيداع/تحويل فى الخزنة") else 0
+            outgoing = amount if movement_type not in ("تحصيل من عميل", "إيداع/تحويل فى الخزنة") else 0
+            cur.execute("""
+                UPDATE treasury SET transaction_date = %s, description = %s, movement_type = %s,
+                    party_name = %s, account_type = %s, incoming = %s, outgoing = %s
+                WHERE id = %s
+            """, (tdate, desc, movement_type, party, account_type, incoming, outgoing, txn_id))
+            conn.commit()
+            log("تعديل حركة خزنة", f"id={txn_id}: {movement_type} - {party} - {amount:,.0f} ({account_type})")
+            flash("تم حفظ التعديلات")
+            conn.close()
+            return redirect(url_for("treasury_report_page"))
+
+    cur.execute("SELECT * FROM treasury WHERE id = %s", (txn_id,))
+    txn = cur.fetchone()
+    conn.close()
+    if not txn:
+        flash("الحركة غير موجودة")
+        return redirect(url_for("treasury_report_page"))
+    return render_template("edit_treasury.html", txn=txn, movement_types=MOVEMENT_TYPES)
+
+
+@app.route("/treasury/<int:txn_id>/delete", methods=["POST"])
+@login_required
+def delete_treasury_page(txn_id):
+    conn = get_connection(dict_cursor=True)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM treasury WHERE id = %s", (txn_id,))
+    txn = cur.fetchone()
+    if txn:
+        cur.execute("DELETE FROM treasury WHERE id = %s", (txn_id,))
+        conn.commit()
+        log("حذف حركة خزنة", f"id={txn_id}: {txn['movement_type']} - {txn['party_name']} - "
+                             f"{(txn['incoming'] or txn['outgoing']):,.0f}")
+        flash("تم حذف الحركة")
+    conn.close()
+    return redirect(url_for("treasury_report_page"))
+
+
 @app.route("/reports/treasury/download")
 @login_required
 def treasury_report_download():

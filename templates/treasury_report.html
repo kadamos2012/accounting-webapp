@@ -34,7 +34,7 @@
     <table>
         <tr>
             <th>التاريخ</th><th>البيان</th><th>نوع الحركة</th><th>الطرف</th><th>الحساب</th>
-            <th>وارد</th><th>منصرف</th><th>يؤثر على الخزنة؟</th><th>الرصيد الجاري (لنفس الحساب)</th>
+            <th>وارد</th><th>منصرف</th><th>يؤثر على الخزنة؟</th><th>الرصيد الجاري (لنفس الحساب)</th><th></th>
         </tr>
         {% for m in movements %}
         <tr style="{{ 'background:#fafafa; color:#999;' if not m.affects_cash }}">
@@ -47,6 +47,7 @@
             <td>{{ "{:,.0f}".format(m.outgoing) if m.outgoing else '-' }}</td>
             <td>{{ 'نعم' if m.affects_cash else 'لا (مباشر)' }}</td>
             <td>{{ "{:,.0f}".format(m.running_balance) if m.affects_cash else '-' }}</td>
+            <td><a href="{{ url_for('edit_treasury_page', txn_id=m.id) }}" class="btn">✏</a></td>
         </tr>
         {% endfor %}
     </table>
