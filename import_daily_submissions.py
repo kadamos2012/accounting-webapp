@@ -66,6 +66,17 @@ def import_file(xlsx_path, performed_by=""):
     pricing_cache = build_pricing_cache(cur)
     new_price_placeholders = set()
 
+    # ---- تحميل الوكلاء/شركات الطيران/موردى الاستثمار الموجودين فعلاً فى الذاكرة
+    # مرة واحدة بس - بدل ما نسأل قاعدة البيانات لكل صف لو الاسم موجود قبل كده،
+    # وده كان السبب الرئيسى فى بطء الاستيراد وانتهاء وقت الطلب (timeout) على
+    # الاستضافة، خصوصًا مع ملفات فيها مئات العملاء ونفس الوكيل/الشركة متكررين ----
+    cur.execute("SELECT name FROM agents")
+    known_agents = {r[0] for r in cur.fetchall()}
+    cur.execute("SELECT name FROM airlines")
+    known_airlines = {r[0] for r in cur.fetchall()}
+    cur.execute("SELECT name FROM investment_suppliers")
+    known_investment_suppliers = {r[0] for r in cur.fetchall()}
+
     added = 0
     skipped = 0
     package_counts = {}
@@ -116,14 +127,17 @@ def import_file(xlsx_path, performed_by=""):
             submit_date, agent, category, package, cache=pricing_cache
         )
 
-        if agent:
+        if agent and agent not in known_agents:
             cur.execute("INSERT INTO agents(name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (agent,))
-        if row_data["airline"]:
+            known_agents.add(agent)
+        if row_data["airline"] and row_data["airline"] not in known_airlines:
             cur.execute("INSERT INTO airlines(name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
                         (row_data["airline"],))
-        if row_data["investment_supplier"]:
+            known_airlines.add(row_data["airline"])
+        if row_data["investment_supplier"] and row_data["investment_supplier"] not in known_investment_suppliers:
             cur.execute("INSERT INTO investment_suppliers(name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
                         (row_data["investment_supplier"],))
+            known_investment_suppliers.add(row_data["investment_supplier"])
 
         cur.execute("""
             INSERT INTO sales(
